@@ -22,6 +22,9 @@
 
 #include "ofxDatGuiComponent.h"
 
+// One global owner for any active mouse press
+static ofxDatGuiComponent * sPressOwner = nullptr;
+
 bool ofxDatGuiLog::mQuiet = false;
 string ofxDatGuiTheme::AssetPath = "";
 std::unique_ptr<ofxDatGuiTheme> ofxDatGuiComponent::theme;
@@ -46,6 +49,9 @@ ofxDatGuiComponent::~ofxDatGuiComponent()
 //  cout << "ofxDatGuiComponent "<< mName << " destroyed" << endl;
     ofRemoveListener(ofEvents().keyPressed, this, &ofxDatGuiComponent::onKeyPressed);
     ofRemoveListener(ofEvents().windowResized, this, &ofxDatGuiComponent::onWindowResized);
+
+	// Clear mouse press ownership
+	if (sPressOwner == this) sPressOwner = nullptr;
 }
 
 /*
@@ -85,7 +91,7 @@ ofxDatGuiType ofxDatGuiComponent::getType()
 
 const ofxDatGuiTheme* ofxDatGuiComponent::getTheme()
 {
-    if (theme == nullptr) theme = make_unique<ofxDatGuiTheme>(true);
+    if (theme == nullptr) theme = std::make_unique<ofxDatGuiTheme>(true);
     return theme.get();
 }
 
@@ -162,6 +168,9 @@ void ofxDatGuiComponent::setPosition(int x, int y)
 void ofxDatGuiComponent::setVisible(bool visible)
 {
     mVisible = visible;
+
+	if (!visible && sPressOwner == this) sPressOwner = nullptr;
+
     if (internalEventCallback != nullptr){
         ofxDatGuiInternalEvent e(ofxDatGuiEventType::VISIBILITY_CHANGED, mIndex);
         internalEventCallback(e);
@@ -348,47 +357,83 @@ void ofxDatGuiComponent::setBorderVisible(bool visible)
     draw methods
 */
 
-void ofxDatGuiComponent::update(bool acceptEvents)
-{
-    if (acceptEvents && mEnabled && mVisible){
-        bool mp = ofGetMousePressed();
-        ofPoint mouse = ofPoint(ofGetMouseX() - mMask.x, ofGetMouseY() - mMask.y);
-        if (hitTest(mouse)){
-            if (!mMouseOver){
-                onMouseEnter(mouse);
-            }
-            if (!mMouseDown && mp){
-                onMousePress(mouse);
-                if (!mFocused) onFocus();
-            }
-        }   else{
-    // the mouse is not over the component //
-            if (mMouseOver){
-                onMouseLeave(mouse);
-            }
-            if (!mMouseDown && mp && mFocused){
-                onFocusLost();
-            }
-        }
-        if (mMouseDown) {
-            if (mp){
-                onMouseDrag(mouse);
-            }   else{
-                onMouseRelease(mouse);
-            }
-        }
-    }
-// don't update children unless they're visible //
-    if (this->getIsExpanded()) {
-        for(int i=0; i<children.size(); i++) {
-            children[i]->update(acceptEvents);
-            if (children[i]->getFocused()){
-                if (acceptEvents == false ) children[i]->setFocused(false);
-                acceptEvents = false;
-            }
-        }
-    }
+// Only true on the exact frame the mouse transitions Up -> Down
+static bool mousePressedThisFrame() {
+	static bool prev = false;
+	static bool thisFrame = false;
+	static uint64_t seenFrame = std::numeric_limits<uint64_t>::max();
+
+	uint64_t f = ofGetFrameNum();
+	if (f != seenFrame) {
+		bool mp = ofGetMousePressed();
+		thisFrame = mp && !prev;
+		prev = mp;
+		seenFrame = f;
+	}
+	return thisFrame;
 }
+
+void ofxDatGuiComponent::update(bool acceptEvents) {
+	const bool mp = ofGetMousePressed();
+	const bool justPressed = mousePressedThisFrame(); // only true on the transition frame
+
+	// Absolute mouse (same space as component x/y)
+	const ofPoint mouseAbs(ofGetMouseX(), ofGetMouseY());
+
+	// Local to mask (only for vertical clip test)
+	const ofPoint mouseLocal(mouseAbs.x - mMask.x, mouseAbs.y - mMask.y);
+
+	 // Only allow hover/highlight when not pressed, or when THIS component owns the press.
+	const bool hoverAllowed = !(mp && sPressOwner != this);
+
+	const bool overGeom = hitTest(mouseAbs) && (mMask.height <= 0 || (mouseLocal.y >= 0 && mouseLocal.y <= mMask.height));
+
+	// Block highlighting on drag-in or while another widget owns the press:
+	const bool over = hoverAllowed && overGeom;
+
+	if (over && !mMouseOver) onMouseEnter(mouseAbs);
+	if (!over && mMouseOver) onMouseLeave(mouseAbs);
+
+	if (acceptEvents && mEnabled && mVisible) {
+		if (mp) {
+			if (sPressOwner == this) {
+				// We already own this press -> keep dragging
+				onMouseDrag(mouseAbs);
+			} else if (sPressOwner == nullptr && overGeom && justPressed) {
+				// Start a brand new press only if it BEGAN here, this frame
+				sPressOwner = this;
+				mMouseDown = true;
+				onMousePress(mouseAbs);
+				if (!mFocused) onFocus();
+			}
+			// else: press started elsewhere -> ignore (no capture on drag-in)
+		} else {
+			if (sPressOwner == this && mMouseDown) {
+				// We owned the press, now it ended
+				onMouseRelease(mouseAbs);
+				mMouseDown = false;
+				sPressOwner = nullptr;
+				// Optional: if your components don't always drop focus themselves on release,
+				// uncomment the next line to keep focus tidy.
+				// if (mFocused) onFocusLost();
+			}
+		}
+	}
+
+	// Children unchanged…
+	if (this->getIsExpanded()) {
+		for (int i = 0; i < children.size(); ++i) {
+			if (!children[i]->getVisible()) continue;
+			children[i]->update(acceptEvents);
+			if (children[i]->getFocused()) {
+				if (acceptEvents == false) children[i]->setFocused(false);
+				acceptEvents = false;
+			}
+		}
+	}
+}
+
+
 
 void ofxDatGuiComponent::draw()
 {

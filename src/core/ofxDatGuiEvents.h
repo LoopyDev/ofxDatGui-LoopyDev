@@ -32,6 +32,8 @@ class ofxDatGuiColorPicker;
 class ofxDatGuiMatrix;
 class ofxDatGuiScrollView;
 class ofxDatGuiScrollViewItem;
+// Loopydev's additions
+class ofxDatGuiCubicBezier;
 
 enum ofxDatGuiEventType
 {
@@ -172,5 +174,15 @@ class ofxDatGuiMatrixEvent{
     ofxDatGuiMatrix* target;
 };
 
-
-
+// LoopyDev's additions
+class ofxDatGuiCubicBezierEvent {
+public:
+	ofxDatGuiCubicBezierEvent(ofxDatGuiCubicBezier * t, float _x1, float _y1, float _x2, float _y2)
+		: target(t)
+		, x1(_x1)
+		, y1(_y1)
+		, x2(_x2)
+		, y2(_y2) { }
+	ofxDatGuiCubicBezier * target;
+	float x1, y1, x2, y2;
+};

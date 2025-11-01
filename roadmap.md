@@ -1,5 +1,18 @@
-### ofxDatGui planned features & roadmap
+### ofxDatGui-LoopyDev planned features & roadmap
+**features**
+* Horizontally stacked buttons
 
+**components**
+* Int slider
+* File/FolderPicker
+* Radio group
+* ColorPicker++
+* CurveEditor
+
+**bugfixes**
+* Prevent text straying outside of text input fields
+
+### Upstream planned features & roadmap
 **features**
 
 * ofParameter support

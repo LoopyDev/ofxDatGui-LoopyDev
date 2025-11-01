@@ -203,7 +203,7 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
             } else if (key == OF_KEY_LEFT) {
                 setCursorIndex(max( (int) mCursorIndex - 1, 0));
             } else if (key == OF_KEY_RIGHT) {
-                setCursorIndex(min( mCursorIndex + 1, (unsigned int) mText.size()));
+                setCursorIndex(std::min( mCursorIndex + 1, (unsigned int) mText.size()));
             } else {
             // insert character at cursor position //
                 setText(mText.substr(0, mCursorIndex) + (char)key + mText.substr(mCursorIndex));

@@ -31,11 +31,12 @@
 #include "ofxDatGuiMatrix.h"
 #include "ofxDatGuiTimeGraph.h"
 #include "ofxDatGuiScrollView.h"
+// LoopyDev's additions
+#include "ofxDatGuiCubicBezier.h"
 
 class ofxDatGuiGroup : public ofxDatGuiButton {
 
     public:
-    
         ofxDatGuiGroup(string label) : ofxDatGuiButton(label), mHeight(0)
         {
             mIsExpanded = false;
@@ -263,6 +264,15 @@ class ofxDatGuiFolder : public ofxDatGuiGroup {
             }
         }
 
+		// Loopydev - ofxDatGuiCubicBezier.h
+		void dispatchCubicBezierEvent(ofxDatGuiCubicBezierEvent e) {
+			if (cubicBezierEventCallback != nullptr) {
+				cubicBezierEventCallback(e);
+			} else {
+				ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
+			}
+		}
+
     /*
         component add methods
     */
@@ -391,6 +401,16 @@ class ofxDatGuiFolder : public ofxDatGuiGroup {
             attachItem(plotter);
             return plotter;
         }
+
+		// Loopydev - ofxDatGuiCubicBezier.h
+		ofxDatGuiCubicBezier * addCubicBezier(string label, float x1 = 0.25f, float y1 = 0.1f, float x2 = 0.25f, float y2 = 1.0f) {
+			ofxDatGuiCubicBezier * bez = new ofxDatGuiCubicBezier(label, x1, y1, x2, y2);
+			bez->setStripeColor(mStyle.stripe.color);
+			bez->onCubicBezierEvent(this, &ofxDatGuiFolder::dispatchCubicBezierEvent);
+			attachItem(bez);
+			return bez;
+		}
+
     
         void attachItem(ofxDatGuiComponent* item)
         {
@@ -411,8 +431,59 @@ class ofxDatGuiFolder : public ofxDatGuiGroup {
 
         static ofxDatGuiFolder* getInstance() { return new ofxDatGuiFolder("X"); }
 
+		private:
+		//bool mHeaderPressed = false;
+
+		//inline bool pointInHeader(const ofPoint & m) const {
+		//	// header is the label bar: full width x mStyle.height tall
+		//	return (m.x > x && m.x < x + mStyle.width && m.y > y && m.y < y + mStyle.height);
+		//}
+
     protected:
-    
+			void onMouseRelease(ofPoint m) override {
+				if (getMouseDown() && mFocused) { // require ownership of the press
+					ofxDatGuiComponent::onFocusLost();
+					ofxDatGuiComponent::onMouseRelease(m);
+					mIsExpanded ? collapse() : expand();
+				} else {
+					ofxDatGuiComponent::onMouseRelease(m);
+				}
+			}
+		//void onMousePress(ofPoint m) override {
+		//	// Arm only if the press STARTED on the header
+		//	mHeaderPressed = pointInHeader(m);
+
+		//	if (mHeaderPressed) {
+		//		// Set pressed + focus so getMouseDown() reflects a real header press
+		//		ofxDatGuiComponent::onMousePress(m);
+		//		if (!mFocused) onFocus(); // from ofxDatGuiComponent
+		//	} else if (mIsExpanded) {
+		//		// Forward to children when open
+		//		for (auto * c : children)
+		//			c->onMousePress(m);
+		//	}
+		//	// Do NOT call ofxDatGuiGroup/ofxDatGuiButton press here
+		//}
+
+		//void onMouseRelease(ofPoint m) override {
+		//	const bool releaseOnHeader = pointInHeader(m);
+
+		//	if (mHeaderPressed && releaseOnHeader) {
+		//		// Valid header click -> toggle
+		//		ofxDatGuiComponent::onMouseRelease(m); // clear pressed
+		//		mIsExpanded ? collapse() : expand();
+		//		ofxDatGuiComponent::onFocusLost(); // drop header focus
+		//	} else {
+		//		// Not a header click: just cleanup + forward to children
+		//		ofxDatGuiComponent::onMouseRelease(m);
+		//		if (mIsExpanded) {
+		//			for (auto * c : children)
+		//				c->onMouseRelease(m);
+		//		}
+		//	}
+		//	mHeaderPressed = false;
+		//}
+
         vector<shared_ptr<ofxDatGuiColorPicker>> pickers;
     
 };

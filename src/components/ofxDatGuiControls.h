@@ -137,13 +137,17 @@ class ofxDatGuiFooter : public ofxDatGuiButton {
     
     protected:
     
-        void onMouseRelease(ofPoint m)
-        {
-            ofxDatGuiComponent::onMouseRelease(m);
-        // dispatch event out to main application //
-            ofxDatGuiInternalEvent e(ofxDatGuiEventType::GUI_TOGGLED, mIndex);
-            internalEventCallback(e);
-        }
+        // ofxDatGuiControls.h  (class ofxDatGuiFooter)
+		void onMouseRelease(ofPoint m) override {
+			// drop focus so the footer doesn’t “own” events forever
+			ofxDatGuiComponent::onFocusLost();
+			ofxDatGuiComponent::onMouseRelease(m);
+
+			// now emit the internal toggle event
+			ofxDatGuiInternalEvent e(ofxDatGuiEventType::GUI_TOGGLED, mIndex);
+			if (internalEventCallback) internalEventCallback(e);
+		}
+
     
     // force footer label to always be centered //
         void setLabelAlignment(ofxDatGuiAlignment align)

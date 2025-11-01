@@ -61,7 +61,7 @@ class ofxDatGuiTextInput : public ofxDatGuiComponent {
         {
             mInput.setText(text);
         }
-    
+
         string getText()
         {
             return mInput.getText();

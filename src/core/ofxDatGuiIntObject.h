@@ -206,5 +206,20 @@ class ofxDatGuiInteractiveObject{
         void onInternalEvent(onInternalEventCallback callback) {
             internalEventCallback = callback;
         }
+
+		// LoopyDev's Additions
+	// cubic-bezier events //
+		typedef std::function<void(ofxDatGuiCubicBezierEvent)> onCubicBezierEventCallback;
+		onCubicBezierEventCallback cubicBezierEventCallback;
+
+		template <typename T, typename args, class ListenerClass>
+		void onCubicBezierEvent(T * owner, void (ListenerClass::*listenerMethod)(args)) {
+			cubicBezierEventCallback = std::bind(listenerMethod, owner, std::placeholders::_1);
+		}
+
+		void onCubicBezierEvent(onCubicBezierEventCallback callback) {
+			cubicBezierEventCallback = callback;
+		}
+
 };
 

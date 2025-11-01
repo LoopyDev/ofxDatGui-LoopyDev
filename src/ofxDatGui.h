@@ -128,7 +128,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         vector<ofxDatGuiComponent*> trash;
         static ofxDatGui* mActiveGui;
         static vector<ofxDatGui*> mGuis;
-        static unique_ptr<ofxDatGuiTheme> theme;
+        static std::unique_ptr<ofxDatGuiTheme> theme;
     
         void init();
         void layoutGui();

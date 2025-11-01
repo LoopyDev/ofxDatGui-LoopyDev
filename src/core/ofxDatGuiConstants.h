@@ -71,7 +71,9 @@ enum class ofxDatGuiType
     FRAME_RATE,
     COLOR_PICKER,
     WAVE_MONITOR,
-    VALUE_PLOTTER
+    VALUE_PLOTTER,
+	// LoopyDev's additions
+	CUBIC_BEZIER
 };
 
 
