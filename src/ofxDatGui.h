@@ -81,6 +81,17 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         ofxDatGuiMatrix* addMatrix(string label, int numButtons, bool showLabels = false);
         ofxDatGuiFolder* addFolder(string label, ofColor color = ofColor::white);
         ofxDatGuiFolder* addFolder(ofxDatGuiFolder* folder);
+        // LoopyDev: add cubic-bezier editor
+        ofxDatGuiCubicBezier* addCubicBezier(string label,
+            float x1 = 0.25f, float y1 = 0.10f,
+            float x2 = 0.25f, float y2 = 1.00f,
+            float padAspect = 1.0f)
+		{
+			auto * bez = new ofxDatGuiCubicBezier(label, x1, y1, x2, y2, padAspect);
+			// If you later want GUI-level routing, you can add a callback like other components.
+			attachItem(bez);
+			return bez;
+		}
     
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();
