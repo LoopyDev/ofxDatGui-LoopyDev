@@ -33,6 +33,7 @@
 #include "ofxDatGuiScrollView.h"
 // LoopyDev's additions
 #include "ofxDatGuiCubicBezier.h"
+#include "ofxDatGuiRadioGroup.h"
 
 enum class ofxDatGuiDropdownBehavior {
     SelectCloses,   // default: existing behavior (select & collapse)
@@ -277,6 +278,23 @@ class ofxDatGuiFolder : public ofxDatGuiGroup {
 				ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
 			}
 		}
+		// --- RadioGroup event bridge ---
+		using RadioGroupCB = std::function<void(ofxDatGuiRadioGroupEvent)>;
+
+		template <typename T>
+		void onRadioGroupEvent(T * listener, void (T::*handler)(ofxDatGuiRadioGroupEvent)) {
+			radioGroupEventCallback = std::bind(handler, listener, std::placeholders::_1);
+		}
+		void onRadioGroupEvent(RadioGroupCB cb) { radioGroupEventCallback = std::move(cb); }
+
+		void dispatchRadioGroupEvent(ofxDatGuiRadioGroupEvent e) {
+			if (radioGroupEventCallback) {
+				radioGroupEventCallback(e);
+			} else {
+				ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
+			}
+		}
+
 
     /*
         component add methods
@@ -415,6 +433,15 @@ class ofxDatGuiFolder : public ofxDatGuiGroup {
 			attachItem(bez);
 			return bez;
 		}
+		// Loopydev - ofxDatGuiRadioGroup.h
+		ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options) {
+			auto * rg = new ofxDatGuiRadioGroup(label, options);
+			rg->setStripeColor(mStyle.stripe.color);
+			// bubble events up to this folder first
+			rg->onRadioGroupEvent(this, &ofxDatGuiFolder::dispatchRadioGroupEvent);
+			attachItem(rg);
+			return rg;
+		}
 
     
         void attachItem(ofxDatGuiComponent* item)
@@ -437,6 +464,8 @@ class ofxDatGuiFolder : public ofxDatGuiGroup {
         static ofxDatGuiFolder* getInstance() { return new ofxDatGuiFolder("X"); }
 
 		private:
+		RadioGroupCB radioGroupEventCallback;
+
 		//bool mHeaderPressed = false;
 
 		//inline bool pointInHeader(const ofPoint & m) const {
