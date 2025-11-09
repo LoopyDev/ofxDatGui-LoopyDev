@@ -8,14 +8,15 @@
 * Radio groups ☑️
 * ColorPicker++
 * CurveEditor
+* Cubic Bezier ☑️
 
 **bugfixes**
 * Prevent text straying outside of text input fields
-* Prevent click+drag from outside GUI to affect components ☑️
+* Simpler focused text input field keypress capture 
+* Prevent click+drag from outside GUI affecting components ☑️
 
 **restructure**
 * ofxDatGuiGroups refractor
-    * Separate new radio groups into own header ☑️
     * Separate dropdowns from groups header
 
 ### Upstream planned features & roadmap
