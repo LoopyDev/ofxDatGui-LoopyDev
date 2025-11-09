@@ -11,5 +11,10 @@
 
 ## What’s different in this fork
 - Working in OF 0.12.1
-- Mouse capture - prevents controls becoming affected by dragging already clicked mouse over GUI
-- Added 'Cubic Bezier' component
+- Mouse capture - prevents control when dragging clicked mouse over GUI
+- Folder nesting
+### New components!
+- Cubic Bezier
+- Radio Group
+
+![ofxDatGui-LoopyDev](https://loopydev.co.uk/img/software/ofxDatGui-LoopyDev/gallery/1.webp "ofxDatGui-LoopyDev")  
