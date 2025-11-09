@@ -1,16 +1,22 @@
 ### ofxDatGui-LoopyDev planned features & roadmap
 **features**
-* Horizontally stacked buttons
+* Horizontal GUI panel
 
 **components**
 * Int slider
 * File/FolderPicker
-* Radio group
+* Radio groups ☑️
 * ColorPicker++
 * CurveEditor
 
 **bugfixes**
 * Prevent text straying outside of text input fields
+* Prevent click+drag from outside GUI to affect components ☑️
+
+**restructure**
+* ofxDatGuiGroups refractor
+    * Separate new radio groups into own header ☑️
+    * Separate dropdowns from groups header
 
 ### Upstream planned features & roadmap
 **features**
