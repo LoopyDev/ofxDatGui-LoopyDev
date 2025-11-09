@@ -73,7 +73,8 @@ enum class ofxDatGuiType
     WAVE_MONITOR,
     VALUE_PLOTTER,
 	// LoopyDev's additions
-	CUBIC_BEZIER
+	CUBIC_BEZIER,
+	RADIO_GROUP
 };
 
 

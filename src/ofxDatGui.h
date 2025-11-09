@@ -23,6 +23,8 @@
 #pragma once
 #include "ofxDatGuiGroups.h"
 #include "ofxDatGuiControls.h"
+// LoopyDev's Additions
+#include "ofxDatGuiRadioGroup.h"
 
 class ofxDatGui : public ofxDatGuiInteractiveObject
 {
@@ -92,6 +94,10 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 			attachItem(bez);
 			return bez;
 		}
+		// LoopyDev: add Radio Groups
+		//ofxDatGuiRadioGroup * addRadioGroup(string label, vector<string> options);
+		ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options);
+
     
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();
@@ -107,7 +113,9 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         ofxDatGuiValuePlotter* getValuePlotter(string label, string folder = "");
         ofxDatGuiFolder* getFolder(string label);
         ofxDatGuiDropdown* getDropdown(string label);
-    
+		// LoopyDev: get Radio Groups
+		ofxDatGuiRadioGroup * getRadioGroup(string label);
+
     private:
     
         int mIndex;
@@ -163,5 +171,13 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void on2dPadEventCallback(ofxDatGui2dPadEvent e);
         void onColorPickerEventCallback(ofxDatGuiColorPickerEvent e);
         void onMatrixEventCallback(ofxDatGuiMatrixEvent e);
+		// LoopyDev: Radio Groups
+		void onRadioGroupEventCallback(ofxDatGuiRadioGroupEvent e);
+		std::function<void(ofxDatGuiRadioGroupEvent)> radioGroupEventCallback;
+		template <typename T>
+		void onRadioGroupEvent(T * listener, void (T::*handler)(ofxDatGuiRadioGroupEvent)) {
+			radioGroupEventCallback = std::bind(handler, listener, std::placeholders::_1);
+		}
+
 
 };

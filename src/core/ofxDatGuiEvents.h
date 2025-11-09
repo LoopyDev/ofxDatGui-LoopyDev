@@ -34,6 +34,7 @@ class ofxDatGuiScrollView;
 class ofxDatGuiScrollViewItem;
 // Loopydev's additions
 class ofxDatGuiCubicBezier;
+class ofxDatGuiRadioGroup;
 
 enum ofxDatGuiEventType
 {
@@ -185,4 +186,14 @@ public:
 		, y2(_y2) { }
 	ofxDatGuiCubicBezier * target;
 	float x1, y1, x2, y2;
+};
+class ofxDatGuiRadioGroupEvent {
+public:
+	ofxDatGuiRadioGroup * target;
+	int index;
+	string label;
+	ofxDatGuiRadioGroupEvent(ofxDatGuiRadioGroup * t, int i, const string & l)
+		: target(t)
+		, index(i)
+		, label(l) { }
 };

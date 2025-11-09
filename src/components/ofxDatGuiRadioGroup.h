@@ -1,0 +1,140 @@
+#pragma once
+#include "ofxDatGuiComponent.h"
+#include "ofxDatGuiControls.h" // where ofxDatGuiToggle lives
+#include "ofxDatGuiEvents.h"
+
+class ofxDatGuiRadioGroup : public ofxDatGuiComponent {
+public:
+	ofxDatGuiRadioGroup(const std::string & label, const std::vector<std::string> & options)
+		: ofxDatGuiComponent(label) {
+		mType = ofxDatGuiType::RADIO_GROUP; // whatever enum you use for this
+		mSelected = -1;
+
+		// Build options as toggles
+		for (auto & s : options)
+			addOption(s);
+
+		// Ensure fonts, colors, metrics are ready NOW (and propagate to children)
+		setTheme(ofxDatGuiComponent::getTheme());
+	}
+
+	static ofxDatGuiRadioGroup * getInstance() { return new ofxDatGuiRadioGroup("X", {}); }
+
+	ofxDatGuiToggle * addOption(const std::string & label) {
+		auto * t = new ofxDatGuiToggle(label, false);
+		t->setStripeVisible(false);
+		t->onToggleEvent(this, &ofxDatGuiRadioGroup::onOptionToggled);
+		// theme gets pushed in setTheme(); safe if nullptr for now
+		children.push_back(t);
+		mOptions.push_back(t);
+		layoutChildren();
+		return t;
+	}
+
+	void setSelectedIndex(int index) {
+		if (index < 0 || index >= (int)mOptions.size()) return;
+		if (mSelected == index) {
+			mOptions[index]->setChecked(true);
+			return;
+		}
+		mSelected = index;
+		for (int i = 0; i < (int)mOptions.size(); ++i)
+			mOptions[i]->setChecked(i == index);
+		dispatch();
+	}
+
+	int getSelectedIndex() const { return mSelected; }
+	std::string getSelectedLabel() const {
+		return (mSelected >= 0 && mSelected < (int)mOptions.size()) ? mOptions[mSelected]->getLabel() : "";
+	}
+
+	// ----- required & common overrides -----
+
+	void setTheme(const ofxDatGuiTheme * t) override {
+		// Apply to this component (sets mFont, sizes, margins, etc.)
+		setComponentStyle(t); // calls children[i]->setTheme(t) internally
+		layoutChildren();
+	}
+
+
+	void setWidth(int width, float labelWidth = 1.f) override {
+		ofxDatGuiComponent::setWidth(width, labelWidth);
+		for (auto * opt : mOptions)
+			opt->setWidth(mStyle.width, mLabel.width);
+		layoutChildren();
+	}
+
+	void setPosition(int x, int y) override {
+		ofxDatGuiComponent::setPosition(x, y);
+		layoutChildren();
+	}
+
+	int getHeight() override {
+		int h = mStyle.height;
+		for (auto * opt : mOptions)
+			h += opt->getHeight();
+		return h;
+	}
+
+	bool getIsExpanded() override { return true; } // radio group is always expanded
+
+	void update(bool acceptEvents = true) override {
+		ofxDatGuiComponent::update(acceptEvents);
+		for (auto * opt : mOptions)
+			opt->update(acceptEvents);
+	}
+
+	void draw() override {
+		if (!mVisible) return;
+		drawBackground();
+		drawLabel();
+		drawStripe();
+		for (auto * opt : mOptions)
+			opt->draw();
+	}
+
+	// event registration
+	template <typename T>
+	void onRadioGroupEvent(T * listener, void (T::*handler)(ofxDatGuiRadioGroupEvent)) {
+		mEventCallback = std::bind(handler, listener, std::placeholders::_1);
+	}
+
+private:
+	std::vector<ofxDatGuiToggle *> mOptions;
+	int mSelected;
+	std::function<void(ofxDatGuiRadioGroupEvent)> mEventCallback;
+
+void layoutChildren() {
+		int cursorY = this->y + mStyle.height;
+		for (auto * opt : mOptions) {
+			opt->setLabelAlignment(mLabel.alignment);
+			opt->setPosition(this->x, cursorY);
+			cursorY += opt->getHeight();
+		}
+	}
+	void onOptionToggled(ofxDatGuiToggleEvent e) {
+		int idx = -1;
+		for (int i = 0; i < (int)mOptions.size(); ++i)
+			if (mOptions[i] == e.target) {
+				idx = i;
+				break;
+			}
+		if (idx < 0) return;
+
+		if (idx != mSelected) {
+			mSelected = idx;
+			for (int i = 0; i < (int)mOptions.size(); ++i)
+				mOptions[i]->setChecked(i == idx);
+			dispatch();
+		} else {
+			// maintain radio semantics
+			mOptions[idx]->setChecked(true);
+		}
+	}
+
+	void dispatch() {
+		if (!mEventCallback) return;
+		ofxDatGuiRadioGroupEvent evt(this, mSelected, getSelectedLabel());
+		mEventCallback(evt);
+	}
+};

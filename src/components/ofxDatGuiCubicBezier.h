@@ -260,10 +260,18 @@ public:
 		dispatchEvent();
 	}
 
+	// ofxDatGuiCubicBezier.h  (inside class)
 	void onMouseRelease(ofPoint m) override {
 		ofxDatGuiComponent::onMouseRelease(m);
 		dragging = Dragging::None;
+
+		// If no inline field is active, release focus so siblings can get events
+		if (!(inX1.hasFocus() || inY1.hasFocus() || inX2.hasFocus() || inY2.hasFocus())) {
+			blurAll(); // keep things tidy
+			ofxDatGuiComponent::onFocusLost();
+		}
 	}
+
 
 	void onFocusLost() override {
 		ofxDatGuiComponent::onFocusLost();

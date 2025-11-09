@@ -21,6 +21,7 @@
 */
 
 #include "ofxDatGui.h"
+//#include "ofxDatGuiRadioGroup.h"
 
 ofxDatGui* ofxDatGui::mActiveGui;
 vector<ofxDatGui*> ofxDatGui::mGuis;
@@ -356,6 +357,26 @@ ofxDatGuiDropdown* ofxDatGui::addDropdown(string label, vector<string> options)
     attachItem(dropdown);
     return dropdown;
 }
+// LoopyDev: Radio Groups
+//ofxDatGuiRadioGroup * ofxDatGui::addRadioGroup(string label, vector<string> options) {
+//	auto * rg = new ofxDatGuiRadioGroup(label, options);
+//	rg->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
+//	attachItem(rg);
+//	return rg;
+//}
+
+//ofxDatGuiRadioGroup * ofxDatGui::addRadioGroup(std::string label, std::vector<std::string> options) {
+//	ofxDatGuiRadioGroup * rg = new ofxDatGuiRadioGroup(label, options);
+//	rg->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
+//	attachItem(rg);
+//	return rg;
+//}
+ofxDatGuiRadioGroup * ofxDatGui::addRadioGroup(const std::string & label, const std::vector<std::string> & options) {
+	ofxDatGuiRadioGroup * rg = new ofxDatGuiRadioGroup(label, options);
+	rg->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
+	attachItem(rg);
+	return rg;
+}
 
 ofxDatGuiFRM* ofxDatGui::addFRM(float refresh)
 {
@@ -406,6 +427,9 @@ ofxDatGuiFolder* ofxDatGui::addFolder(string label, ofColor color)
     folder->onTextInputEvent(this, &ofxDatGui::onTextInputEventCallback);
     folder->onColorPickerEvent(this, &ofxDatGui::onColorPickerEventCallback);
     folder->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
+	// LoopyDev
+	folder->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
+
     attachItem(folder);
     return folder;
 }
@@ -610,6 +634,16 @@ ofxDatGuiDropdown* ofxDatGui::getDropdown(string dl)
     }
     return o;
 }
+// LoopyDev: Radio Groups
+ofxDatGuiRadioGroup * ofxDatGui::getRadioGroup(string rl) {
+	auto * o = static_cast<ofxDatGuiRadioGroup *>(getComponent(ofxDatGuiType::RADIO_GROUP, rl));
+	if (o == nullptr) {
+		o = ofxDatGuiRadioGroup::getInstance();
+		ofxDatGuiLog::write(ofxDatGuiMsg::COMPONENT_NOT_FOUND, rl);
+		trash.push_back(o);
+	}
+	return o;
+}
 
 ofxDatGuiFolder* ofxDatGui::getFolder(string fl)
 {
@@ -714,6 +748,14 @@ void ofxDatGui::onDropdownEventCallback(ofxDatGuiDropdownEvent e)
     }
 // adjust the gui after a dropdown is closed //
     layoutGui();
+}
+// LoopyDev: Radio Groups
+void ofxDatGui::onRadioGroupEventCallback(ofxDatGuiRadioGroupEvent e) {
+	if (radioGroupEventCallback != nullptr) {
+		radioGroupEventCallback(e);
+	} else {
+		ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
+	}
 }
 
 void ofxDatGui::on2dPadEventCallback(ofxDatGui2dPadEvent e)
