@@ -357,7 +357,7 @@ void ofxDatGuiComponent::setBorderVisible(bool visible)
     draw methods
 */
 
-// Only true on the exact frame the mouse transitions Up -> Down
+// Only true on the exact frame the mouse transitions Up > Down
 static bool mousePressedThisFrame() {
 	static bool prev = false;
 	static bool thisFrame = false;
@@ -387,6 +387,8 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 	const bool hoverAllowed = !(mp && sPressOwner != this);
 
 	const bool overGeom = hitTest(mouseAbs) && (mMask.height <= 0 || (mouseLocal.y >= 0 && mouseLocal.y <= mMask.height));
+	// If this is an expanded container, don't steal presses that begin in the child area (below header).
+	const bool pressInChildRegion = getIsExpanded() && !children.empty() && (ofGetMouseY() > y + mStyle.height);
 
 	// Block highlighting on drag-in or while another widget owns the press:
 	const bool over = hoverAllowed && overGeom;
@@ -397,38 +399,31 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 	if (acceptEvents && mEnabled && mVisible) {
 		if (mp) {
 			if (sPressOwner == this) {
-				// We already own this press -> keep dragging
+				// We already own this press > keep dragging
 				onMouseDrag(mouseAbs);
-			} else if (sPressOwner == nullptr && overGeom && justPressed) {
+			} else if (sPressOwner == nullptr && overGeom && justPressed && !pressInChildRegion) {
 				// Start a brand new press only if it BEGAN here, this frame
 				sPressOwner = this;
 				mMouseDown = true;
 				onMousePress(mouseAbs);
 				if (!mFocused) onFocus();
 			}
-			// else: press started elsewhere -> ignore (no capture on drag-in)
+			// else: press started elsewhere > ignore (no capture on drag-in)
 		} else {
-			if (sPressOwner == this && mMouseDown) {
-				// We owned the press, now it ended
+			if (sPressOwner == this) {
+				// Mouse went up; we were the owner ? release, even if mMouseDown was toggled elsewhere
 				onMouseRelease(mouseAbs);
 				mMouseDown = false;
 				sPressOwner = nullptr;
-				// Optional: if your components don't always drop focus themselves on release,
-				// uncomment the next line to keep focus tidy.
-				// if (mFocused) onFocusLost();
 			}
 		}
+
 	}
 
-	// Children unchanged…
 	if (this->getIsExpanded()) {
 		for (int i = 0; i < children.size(); ++i) {
 			if (!children[i]->getVisible()) continue;
 			children[i]->update(acceptEvents);
-			if (children[i]->getFocused()) {
-				if (acceptEvents == false) children[i]->setFocused(false);
-				acceptEvents = false;
-			}
 		}
 	}
 }
@@ -546,5 +541,3 @@ void ofxDatGuiComponent::onWindowResized(ofResizeEventArgs &e)
 {
     onWindowResized();
 }
-
-

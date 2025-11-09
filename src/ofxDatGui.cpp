@@ -21,7 +21,6 @@
 */
 
 #include "ofxDatGui.h"
-//#include "ofxDatGuiRadioGroup.h"
 
 ofxDatGui* ofxDatGui::mActiveGui;
 vector<ofxDatGui*> ofxDatGui::mGuis;
@@ -357,20 +356,6 @@ ofxDatGuiDropdown* ofxDatGui::addDropdown(string label, vector<string> options)
     attachItem(dropdown);
     return dropdown;
 }
-// LoopyDev: Radio Groups
-//ofxDatGuiRadioGroup * ofxDatGui::addRadioGroup(string label, vector<string> options) {
-//	auto * rg = new ofxDatGuiRadioGroup(label, options);
-//	rg->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
-//	attachItem(rg);
-//	return rg;
-//}
-
-//ofxDatGuiRadioGroup * ofxDatGui::addRadioGroup(std::string label, std::vector<std::string> options) {
-//	ofxDatGuiRadioGroup * rg = new ofxDatGuiRadioGroup(label, options);
-//	rg->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
-//	attachItem(rg);
-//	return rg;
-//}
 ofxDatGuiRadioGroup * ofxDatGui::addRadioGroup(const std::string & label, const std::vector<std::string> & options) {
 	ofxDatGuiRadioGroup * rg = new ofxDatGuiRadioGroup(label, options);
 	rg->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
@@ -911,37 +896,34 @@ void ofxDatGui::update()
         if (mExpanded == false){
             mGuiFooter->update();
             mMouseDown = mGuiFooter->getMouseDown();
-        }   else{
-            bool hitComponent = false;
-            for (int i=0; i<items.size(); i++) {
-                if (hitComponent == false){
-                    items[i]->update(true);
-                    if (items[i]->getFocused()) {
-                        hitComponent = true;
-                        mMouseDown = items[i]->getMouseDown();
-                        if (mGuiHeader != nullptr && mGuiHeader->getDraggable() && mGuiHeader->getFocused()){
-                    // track that we're moving to force preserve focus //
-                            mMoving = true;
-                            ofPoint mouse = ofPoint(ofGetMouseX(), ofGetMouseY());
-                            moveGui(mouse - mGuiHeader->getDragOffset());
-                        }
-                    }   else if (items[i]->getIsExpanded()){
-                    // check if one of its children has focus //
-                        for (int j=0; j<items[i]->children.size(); j++) {
-                            if (items[i]->children[j]->getFocused()){
-                                hitComponent = true;
-                                mMouseDown = items[i]->children[j]->getMouseDown();
-                                break;
-                            }
-                        }
-                    }
-                }   else{
-            // update component but ignore mouse & keyboard events //
-                    items[i]->update(false);
-                    if (items[i]->getFocused()) items[i]->setFocused(false);
-                }
-            }
-        }
+		} else {
+			// 1) Update every item; sPressOwner in the component layer guarantees only the owner reacts.
+			for (int i = 0; i < items.size(); ++i) {
+				items[i]->update(true);
+			}
+
+			// 2) Panel-level mMouseDown = any descendant is down
+			auto anyMouseDown = [&](auto && self, ofxDatGuiComponent * node) -> bool {
+				if (node->getMouseDown()) return true;
+				for (auto * c : node->children)
+					if (self(self, c)) return true;
+				return false;
+			};
+			mMouseDown = false;
+			for (int i = 0; i < items.size() && !mMouseDown; ++i) {
+				if (anyMouseDown(anyMouseDown, items[i])) mMouseDown = true;
+			}
+
+			// 3) Only drag the panel when the header itself is pressed (so other presses don't move it)
+			if (mGuiHeader != nullptr && mGuiHeader->getDraggable() && mGuiHeader->getMouseDown()) {
+				mMoving = true;
+				ofPoint mouse(ofGetMouseX(), ofGetMouseY());
+				moveGui(mouse - mGuiHeader->getDragOffset());
+			}
+		
+
+		}
+
     }
 // empty the trash //
     for (int i=0; i<trash.size(); i++) delete trash[i];
