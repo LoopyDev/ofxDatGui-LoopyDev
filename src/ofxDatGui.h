@@ -24,7 +24,7 @@
 #include "ofxDatGuiGroups.h"
 #include "ofxDatGuiControls.h"
 // LoopyDev's Additions
-#include "ofxDatGuiRadioGroup.h"
+//#include "ofxDatGuiRadioGroup.h"
 
 class ofxDatGui : public ofxDatGuiInteractiveObject
 {
@@ -95,9 +95,13 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 			return bez;
 		}
 		// LoopyDev: add Radio Groups
-		//ofxDatGuiRadioGroup * addRadioGroup(string label, vector<string> options);
 		ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options);
-
+		// LoopyDev: add Curve Editor
+		ofxDatGuiCurveEditor * addCurveEditor(string label, float padAspect) {
+			auto * curve = new ofxDatGuiCurveEditor("Response Curve", 0.6f /*padAspect*/);
+			attachItem(curve);
+			return curve;
+		};
     
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();

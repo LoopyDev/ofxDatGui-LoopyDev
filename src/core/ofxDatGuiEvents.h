@@ -35,6 +35,7 @@ class ofxDatGuiScrollViewItem;
 // Loopydev's additions
 class ofxDatGuiCubicBezier;
 class ofxDatGuiRadioGroup;
+class ofxDatGuiCurveEditor;
 
 enum ofxDatGuiEventType
 {
@@ -187,6 +188,7 @@ public:
 	ofxDatGuiCubicBezier * target;
 	float x1, y1, x2, y2;
 };
+
 class ofxDatGuiRadioGroupEvent {
 public:
 	ofxDatGuiRadioGroup * target;
@@ -196,4 +198,14 @@ public:
 		: target(t)
 		, index(i)
 		, label(l) { }
+};
+
+class ofxDatGuiCurveEditorEvent {
+public:
+	ofxDatGuiCurveEditor * target;
+	std::vector<ofPoint> points; // normalized [0..1] points, in order
+
+	ofxDatGuiCurveEditorEvent(ofxDatGuiCurveEditor * t, const std::vector<ofPoint> & pts)
+		: target(t)
+		, points(pts) { }
 };

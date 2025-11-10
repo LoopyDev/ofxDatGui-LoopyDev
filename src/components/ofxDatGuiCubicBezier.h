@@ -12,10 +12,6 @@
 #pragma once
 #include "ofxDatGuiComponent.h"
 #include "ofxDatGuiTextInputField.h"
-#include <algorithm>
-#include <cmath>
-#include <iomanip>
-#include <sstream>
 
 struct ofxDatGuiCubicBezierEvent; // declared in ofxDatGuiEvents.h
 
