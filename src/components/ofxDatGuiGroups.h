@@ -18,6 +18,7 @@
 // LoopyDev additions
 #include "ofxDatGuiCubicBezier.h"
 #include "ofxDatGuiRadioGroup.h"
+#include "ofxDatGuiCurveEditor.h"
 
 enum class ofxDatGuiDropdownBehavior {
 	SelectCloses, // legacy behavior: select and collapse
@@ -252,6 +253,12 @@ public:
 		else
 			ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
 	}
+	void dispatchCurveEditorEvent(ofxDatGuiCurveEditorEvent e) {
+		if (curveEditorEventCallback)
+			curveEditorEventCallback(e);
+		else
+			ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
+	}
 
 	// RadioGroup event bridge
 	using RadioGroupCB = std::function<void(ofxDatGuiRadioGroupEvent)>;
@@ -282,6 +289,9 @@ public:
 		sub->onMatrixEvent(this, &ofxDatGuiFolder::dispatchMatrixEvent);
 		sub->onInternalEvent(this, &ofxDatGuiFolder::dispatchInternalEvent);
 		sub->onRadioGroupEvent(this, &ofxDatGuiFolder::dispatchRadioGroupEvent);
+		sub->onCubicBezierEvent(this, &ofxDatGuiFolder::dispatchCubicBezierEvent);
+		sub->onCurveEditorEvent(this, &ofxDatGuiFolder::dispatchCurveEditorEvent);
+
 		attachItem(sub);
 		return sub;
 	}
@@ -403,6 +413,24 @@ public:
 		attachItem(bez);
 		return bez;
 	}
+
+	    ofxDatGuiCurveEditor * addCurveEditor(string label, float padAspect = 1.0f) {
+		auto * ce = new ofxDatGuiCurveEditor(label, padAspect);
+		ce->setStripeColor(mStyle.stripe.color);
+		ce->onCurveEditorEvent(this, &ofxDatGuiFolder::dispatchCurveEditorEvent);
+		attachItem(ce);
+		return ce;
+	}
+
+	// Convenience overload to set initial points
+	ofxDatGuiCurveEditor * addCurveEditor(string label,
+		const std::vector<ofPoint> & points,
+		float padAspect = 1.0f) {
+		auto * ce = addCurveEditor(label, padAspect);
+		ce->setPoints(points);
+		return ce;
+	}
+
 
 	ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options) {
 		auto * rg = new ofxDatGuiRadioGroup(label, options);

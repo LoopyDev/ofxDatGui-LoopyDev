@@ -74,7 +74,8 @@ enum class ofxDatGuiType
     VALUE_PLOTTER,
 	// LoopyDev's additions
 	CUBIC_BEZIER,
-	RADIO_GROUP
+	RADIO_GROUP,
+	CURVE_EDITOR
 };
 
 

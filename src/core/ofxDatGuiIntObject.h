@@ -220,6 +220,17 @@ class ofxDatGuiInteractiveObject{
 		void onCubicBezierEvent(onCubicBezierEventCallback callback) {
 			cubicBezierEventCallback = callback;
 		}
+	// Curve Editor events //
+		typedef std::function<void(ofxDatGuiCurveEditorEvent)> onCurveEditorEventCallback;
+		onCurveEditorEventCallback curveEditorEventCallback;
 
+		template <typename T, typename args, class ListenerClass>
+		void onCurveEditorEvent(T * owner, void (ListenerClass::*listenerMethod)(args)) {
+			curveEditorEventCallback = std::bind(listenerMethod, owner, std::placeholders::_1);
+		}
+
+		void onCurveEditorEvent(onCurveEditorEventCallback callback) {
+			curveEditorEventCallback = callback;
+		}
 };
 
