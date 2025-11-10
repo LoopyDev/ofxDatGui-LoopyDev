@@ -414,6 +414,7 @@ ofxDatGuiFolder* ofxDatGui::addFolder(string label, ofColor color)
     folder->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
 	// LoopyDev
 	folder->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
+	folder->onDropdownEvent(this, &ofxDatGui::onDropdownEventCallback);
 
     attachItem(folder);
     return folder;

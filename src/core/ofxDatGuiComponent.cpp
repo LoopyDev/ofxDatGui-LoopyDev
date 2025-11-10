@@ -222,6 +222,11 @@ void ofxDatGuiComponent::setMask(const ofRectangle &mask)
     mMask = mask;
 }
 
+// LoopyDev - Clobal Click Capture
+void ofxDatGuiComponent::clearGlobalPressOwner() { sPressOwner = nullptr; }
+bool ofxDatGuiComponent::isAnyPressActive() { return sPressOwner != nullptr; }
+
+
 void ofxDatGuiComponent::setAnchor(ofxDatGuiAnchor anchor)
 {
     mAnchor = anchor;
@@ -432,6 +437,7 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 
 void ofxDatGuiComponent::draw()
 {
+
     ofPushStyle();
         if (mStyle.border.visible) drawBorder();
         drawBackground();

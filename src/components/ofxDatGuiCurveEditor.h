@@ -154,7 +154,17 @@ public:
 	}
 
 	/// @return A copy of the normalized points (each in [0..1]).
-	std::vector<ofPoint> getPoints() const { return points; }
+	/// @param flipY If true, return points with Y flipped (screen-style): y = 1 - y.
+	std::vector<ofPoint> getPoints(bool flipY = false) const {
+		if (!flipY) return points; // fast path (no extra alloc)
+
+		std::vector<ofPoint> out;
+		out.reserve(points.size());
+		for (const auto & p : points) {
+			out.emplace_back(p.x, 1.f - p.y); // z defaults to 0
+		}
+		return out;
+	}
 
 	/**
      * @brief Get a polyline of normalized points.

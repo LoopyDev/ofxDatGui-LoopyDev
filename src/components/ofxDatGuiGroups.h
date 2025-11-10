@@ -15,15 +15,21 @@
 #include "ofxDatGuiTextInput.h"
 #include "ofxDatGuiTimeGraph.h"
 
-// LoopyDev additions
+// LoopyDev's Edits
+//#include "ofxDatGuiDropdown.h"
+
+// LoopyDev's Additions
 #include "ofxDatGuiCubicBezier.h"
 #include "ofxDatGuiRadioGroup.h"
 #include "ofxDatGuiCurveEditor.h"
 
-enum class ofxDatGuiDropdownBehavior {
-	SelectCloses, // legacy behavior: select and collapse
-	RadioStaysOpen // radio-like: mutually exclusive, keep open
-};
+//enum class ofxDatGuiDropdownBehavior {
+//	SelectCloses, // legacy behavior: select and collapse
+//	RadioStaysOpen // radio-like: mutually exclusive, keep open
+//};
+
+// Forward Declarations
+class ofxDatGuiDropdown;
 
 // -----------------------------------------------------------------------------
 // Group
@@ -57,6 +63,7 @@ public:
 		onGroupToggled();
 	}
 	void collapse() {
+		ofxDatGuiComponent::clearGlobalPressOwner();
 		mIsExpanded = false;
 		layout();
 		onGroupToggled();
@@ -276,6 +283,23 @@ public:
 			ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
 	}
 
+	// Dropdown event bridge
+	using ofxDatGuiInteractiveObject::onDropdownEvent;
+
+
+	using DropdownCB = std::function<void(ofxDatGuiDropdownEvent)>;
+	template <typename T>
+	void onDropdownEvent(T * listener, void (T::*handler)(ofxDatGuiDropdownEvent)) {
+		dropdownEventCallback = std::bind(handler, listener, std::placeholders::_1);
+	}
+	void onDropdownEvent(DropdownCB cb) { dropdownEventCallback = std::move(cb); }
+	void dispatchDropdownEvent(ofxDatGuiDropdownEvent e) {
+		if (dropdownEventCallback)
+			dropdownEventCallback(e);
+		else
+			ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
+	}
+
 	// Adders
 	ofxDatGuiFolder * addFolder(string label, ofColor color = ofColor::white) {
 		auto * sub = new ofxDatGuiFolder(label, color);
@@ -440,6 +464,10 @@ public:
 		return rg;
 	}
 
+	ofxDatGuiDropdown * addDropdown(std::string label, const std::vector<std::string> & options);
+
+
+
 	void attachItem(ofxDatGuiComponent * item) {
 		item->setIndex((int)children.size());
 		item->onInternalEvent(this, &ofxDatGuiFolder::dispatchInternalEvent);
@@ -456,6 +484,8 @@ public:
 	static ofxDatGuiFolder * getInstance() { return new ofxDatGuiFolder("X"); }
 
 private:
+	DropdownCB dropdownEventCallback;
+
 	RadioGroupCB radioGroupEventCallback;
 	std::vector<std::shared_ptr<ofxDatGuiColorPicker>> pickers;
 
@@ -497,230 +527,230 @@ protected:
 // -----------------------------------------------------------------------------
 // Dropdown Option
 // -----------------------------------------------------------------------------
-class ofxDatGuiDropdownOption : public ofxDatGuiButton {
-
-public:
-	ofxDatGuiDropdownOption(string label)
-		: ofxDatGuiButton(label)
-		, mIsRadio(false)
-		, mChecked(false) {
-		mType = ofxDatGuiType::DROPDOWN_OPTION;
-		setTheme(ofxDatGuiComponent::getTheme());
-	}
-
-	void setTheme(const ofxDatGuiTheme * theme) override {
-		ofxDatGuiButton::setTheme(theme);
-		mStyle.stripe.color = theme->stripe.dropdown;
-	}
-
-	void setWidth(int width, float labelWidth = 1) override {
-		ofxDatGuiComponent::setWidth(width, labelWidth);
-		mLabel.width = mStyle.width;
-		mLabel.rightAlignedXpos = mIcon.x - mLabel.margin;
-		ofxDatGuiComponent::positionLabel();
-	}
-
-	// Radio helpers
-	void setRadio(bool b) { mIsRadio = b; }
-	bool isRadio() const { return mIsRadio; }
-
-	void setChecked(bool b) { mChecked = b; }
-	bool getChecked() const { return mChecked; }
-
-	void draw() override {
-		if (!mVisible) return;
-
-		ofPushStyle();
-		ofxDatGuiButton::draw();
-
-		if (mIsRadio) {
-			float cx = x + 12.0f;
-			float cy = y + mStyle.height * 0.5f;
-			float r = 6.0f;
-
-			ofSetColor(mEnabled ? ofColor::white : ofColor(180));
-			ofNoFill();
-			ofDrawCircle(cx, cy, r);
-
-			if (mChecked) {
-				ofFill();
-				ofDrawCircle(cx, cy, r * 0.55f);
-			}
-		}
-		ofPopStyle();
-	}
-
-private:
-	bool mIsRadio;
-	bool mChecked;
-};
+//class ofxDatGuiDropdownOption : public ofxDatGuiButton {
+//
+//public:
+//	ofxDatGuiDropdownOption(string label)
+//		: ofxDatGuiButton(label)
+//		, mIsRadio(false)
+//		, mChecked(false) {
+//		mType = ofxDatGuiType::DROPDOWN_OPTION;
+//		setTheme(ofxDatGuiComponent::getTheme());
+//	}
+//
+//	void setTheme(const ofxDatGuiTheme * theme) override {
+//		ofxDatGuiButton::setTheme(theme);
+//		mStyle.stripe.color = theme->stripe.dropdown;
+//	}
+//
+//	void setWidth(int width, float labelWidth = 1) override {
+//		ofxDatGuiComponent::setWidth(width, labelWidth);
+//		mLabel.width = mStyle.width;
+//		mLabel.rightAlignedXpos = mIcon.x - mLabel.margin;
+//		ofxDatGuiComponent::positionLabel();
+//	}
+//
+//	// Radio helpers
+//	void setRadio(bool b) { mIsRadio = b; }
+//	bool isRadio() const { return mIsRadio; }
+//
+//	void setChecked(bool b) { mChecked = b; }
+//	bool getChecked() const { return mChecked; }
+//
+//	void draw() override {
+//		if (!mVisible) return;
+//
+//		ofPushStyle();
+//		ofxDatGuiButton::draw();
+//
+//		if (mIsRadio) {
+//			float cx = x + 12.0f;
+//			float cy = y + mStyle.height * 0.5f;
+//			float r = 6.0f;
+//
+//			ofSetColor(mEnabled ? ofColor::white : ofColor(180));
+//			ofNoFill();
+//			ofDrawCircle(cx, cy, r);
+//
+//			if (mChecked) {
+//				ofFill();
+//				ofDrawCircle(cx, cy, r * 0.55f);
+//			}
+//		}
+//		ofPopStyle();
+//	}
+//
+//private:
+//	bool mIsRadio;
+//	bool mChecked;
+//};
 
 // -----------------------------------------------------------------------------
 // Dropdown
 // -----------------------------------------------------------------------------
-class ofxDatGuiDropdown : public ofxDatGuiGroup {
-
-public:
-	ofxDatGuiDropdown(string label,
-		const std::vector<std::string> & options = std::vector<std::string>(),
-		ofxDatGuiDropdownBehavior behavior = ofxDatGuiDropdownBehavior::SelectCloses)
-		: ofxDatGuiGroup(label)
-		, mOption(0)
-		, mBehavior(behavior) {
-		mType = ofxDatGuiType::DROPDOWN;
-
-		for (int i = 0; i < (int)options.size(); i++) {
-			auto * opt = new ofxDatGuiDropdownOption(options[i]);
-			opt->setIndex((int)children.size());
-			opt->onButtonEvent(this, &ofxDatGuiDropdown::onOptionSelected);
-			if (mBehavior == ofxDatGuiDropdownBehavior::RadioStaysOpen) opt->setRadio(true);
-			children.push_back(opt);
-		}
-
-		setTheme(ofxDatGuiComponent::getTheme());
-
-		if (mBehavior == ofxDatGuiDropdownBehavior::RadioStaysOpen && size() > 0) {
-			getChildAt(mOption)->setChecked(true);
-		}
-	}
-
-	void setTheme(const ofxDatGuiTheme * theme) override {
-		setComponentStyle(theme);
-		mIconOpen = theme->icon.groupOpen;
-		mIconClosed = theme->icon.groupClosed;
-		mStyle.stripe.color = theme->stripe.dropdown;
-		setWidth(theme->layout.width, theme->layout.labelWidth);
-	}
-
-	void setWidth(int width, float labelWidth = 1) override {
-		ofxDatGuiComponent::setWidth(width, labelWidth);
-		mLabel.width = mStyle.width;
-		mLabel.rightAlignedXpos = mIcon.x - mLabel.margin;
-		ofxDatGuiComponent::positionLabel();
-	}
-
-	void select(int cIndex) {
-		if (cIndex < 0 || cIndex >= (int)children.size()) {
-			ofLogError() << "ofxDatGuiDropdown->select(" << cIndex << ") is out of range";
-			return;
-		}
-
-		mOption = cIndex;
-
-		if (mBehavior == ofxDatGuiDropdownBehavior::SelectCloses) {
-			setLabel(children[cIndex]->getLabel());
-			collapse();
-		} else {
-			for (int i = 0; i < (int)children.size(); ++i) {
-				if (auto * t = dynamic_cast<ofxDatGuiToggle *>(children[i])) {
-					t->setChecked(i == cIndex);
-				} else if (auto * opt = dynamic_cast<ofxDatGuiDropdownOption *>(children[i])) {
-					if (opt->isRadio()) opt->setChecked(i == cIndex);
-				}
-			}
-		}
-
-		dispatchEvent();
-	}
-
-	int size() { return (int)children.size(); }
-
-	ofxDatGuiDropdownOption * getChildAt(int index) { return static_cast<ofxDatGuiDropdownOption *>(children[index]); }
-	ofxDatGuiDropdownOption * getSelected() { return static_cast<ofxDatGuiDropdownOption *>(children[mOption]); }
-
-	void dispatchEvent() {
-		if (dropdownEventCallback) {
-			ofxDatGuiDropdownEvent e(this, mIndex, mOption);
-			dropdownEventCallback(e);
-		} else {
-			ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
-		}
-	}
-
-	static ofxDatGuiDropdown * getInstance() { return new ofxDatGuiDropdown("X"); }
-
-	void setRadioMode(bool enabled) {
-		mBehavior = enabled ? ofxDatGuiDropdownBehavior::RadioStaysOpen
-							: ofxDatGuiDropdownBehavior::SelectCloses;
-
-		if (mUseToggleChildren && enabled) {
-			rebuildAs(true);
-		} else if (mUseToggleChildren && !enabled) {
-			rebuildAs(false);
-		} else {
-			for (int i = 0; i < (int)children.size(); ++i) {
-				auto * opt = static_cast<ofxDatGuiDropdownOption *>(children[i]);
-				opt->setRadio(enabled);
-				opt->setChecked(enabled && (i == mOption));
-			}
-		}
-	}
-
-	bool isRadioMode() const { return mBehavior == ofxDatGuiDropdownBehavior::RadioStaysOpen; }
-
-	void onToggleSelected(ofxDatGuiToggleEvent e) {
-		int clicked = mOption;
-		for (int i = 0; i < (int)children.size(); ++i) {
-			if (e.target == children[i]) {
-				clicked = i;
-				break;
-			}
-		}
-		select(clicked);
-	}
-
-private:
-	void onOptionSelected(ofxDatGuiButtonEvent e) {
-		int clicked = mOption;
-		for (int i = 0; i < (int)children.size(); i++)
-			if (e.target == children[i]) {
-				clicked = i;
-				break;
-			}
-		select(clicked);
-	}
-
-	void rebuildAs(bool useToggles) {
-		std::vector<std::string> labels;
-		labels.reserve(children.size());
-		for (auto * c : children)
-			labels.push_back(c->getLabel());
-
-		for (auto * c : children) {
-			if (c->getType() != ofxDatGuiType::COLOR_PICKER) delete c;
-		}
-		children.clear();
-
-		for (int i = 0; i < (int)labels.size(); ++i) {
-			if (useToggles) {
-				auto * t = new ofxDatGuiToggle(labels[i], i == mOption);
-				t->setIndex((int)children.size());
-				t->onToggleEvent(this, &ofxDatGuiDropdown::onToggleSelected);
-				children.push_back(t);
-			} else {
-				auto * opt = new ofxDatGuiDropdownOption(labels[i]);
-				opt->setIndex((int)children.size());
-				opt->onButtonEvent(this, &ofxDatGuiDropdown::onOptionSelected);
-				if (isRadioMode()) opt->setRadio(true);
-				children.push_back(opt);
-			}
-		}
-
-		setTheme(ofxDatGuiComponent::getTheme());
-
-		if (isRadioMode()) {
-			for (int i = 0; i < (int)children.size(); ++i) {
-				if (useToggles) {
-					if (auto * t = dynamic_cast<ofxDatGuiToggle *>(children[i])) t->setChecked(i == mOption);
-				} else {
-					if (auto * o = dynamic_cast<ofxDatGuiDropdownOption *>(children[i])) o->setChecked(i == mOption);
-				}
-			}
-		}
-	}
-
-	bool mUseToggleChildren = true; // prefer real toggles in radio mode
-
-	int mOption = 0;
-	ofxDatGuiDropdownBehavior mBehavior;
-};
+//class ofxDatGuiDropdown : public ofxDatGuiGroup {
+//
+//public:
+//	ofxDatGuiDropdown(string label,
+//		const std::vector<std::string> & options = std::vector<std::string>(),
+//		ofxDatGuiDropdownBehavior behavior = ofxDatGuiDropdownBehavior::SelectCloses)
+//		: ofxDatGuiGroup(label)
+//		, mOption(0)
+//		, mBehavior(behavior) {
+//		mType = ofxDatGuiType::DROPDOWN;
+//
+//		for (int i = 0; i < (int)options.size(); i++) {
+//			auto * opt = new ofxDatGuiDropdownOption(options[i]);
+//			opt->setIndex((int)children.size());
+//			opt->onButtonEvent(this, &ofxDatGuiDropdown::onOptionSelected);
+//			if (mBehavior == ofxDatGuiDropdownBehavior::RadioStaysOpen) opt->setRadio(true);
+//			children.push_back(opt);
+//		}
+//
+//		setTheme(ofxDatGuiComponent::getTheme());
+//
+//		if (mBehavior == ofxDatGuiDropdownBehavior::RadioStaysOpen && size() > 0) {
+//			getChildAt(mOption)->setChecked(true);
+//		}
+//	}
+//
+//	void setTheme(const ofxDatGuiTheme * theme) override {
+//		setComponentStyle(theme);
+//		mIconOpen = theme->icon.groupOpen;
+//		mIconClosed = theme->icon.groupClosed;
+//		mStyle.stripe.color = theme->stripe.dropdown;
+//		setWidth(theme->layout.width, theme->layout.labelWidth);
+//	}
+//
+//	void setWidth(int width, float labelWidth = 1) override {
+//		ofxDatGuiComponent::setWidth(width, labelWidth);
+//		mLabel.width = mStyle.width;
+//		mLabel.rightAlignedXpos = mIcon.x - mLabel.margin;
+//		ofxDatGuiComponent::positionLabel();
+//	}
+//
+//	void select(int cIndex) {
+//		if (cIndex < 0 || cIndex >= (int)children.size()) {
+//			ofLogError() << "ofxDatGuiDropdown->select(" << cIndex << ") is out of range";
+//			return;
+//		}
+//
+//		mOption = cIndex;
+//
+//		if (mBehavior == ofxDatGuiDropdownBehavior::SelectCloses) {
+//			setLabel(children[cIndex]->getLabel());
+//			collapse();
+//		} else {
+//			for (int i = 0; i < (int)children.size(); ++i) {
+//				if (auto * t = dynamic_cast<ofxDatGuiToggle *>(children[i])) {
+//					t->setChecked(i == cIndex);
+//				} else if (auto * opt = dynamic_cast<ofxDatGuiDropdownOption *>(children[i])) {
+//					if (opt->isRadio()) opt->setChecked(i == cIndex);
+//				}
+//			}
+//		}
+//
+//		dispatchEvent();
+//	}
+//
+//	int size() { return (int)children.size(); }
+//
+//	ofxDatGuiDropdownOption * getChildAt(int index) { return static_cast<ofxDatGuiDropdownOption *>(children[index]); }
+//	ofxDatGuiDropdownOption * getSelected() { return static_cast<ofxDatGuiDropdownOption *>(children[mOption]); }
+//
+//	void dispatchEvent() {
+//		if (dropdownEventCallback) {
+//			ofxDatGuiDropdownEvent e(this, mIndex, mOption);
+//			dropdownEventCallback(e);
+//		} else {
+//			ofxDatGuiLog::write(ofxDatGuiMsg::EVENT_HANDLER_NULL);
+//		}
+//	}
+//
+//	static ofxDatGuiDropdown * getInstance() { return new ofxDatGuiDropdown("X"); }
+//
+//	void setRadioMode(bool enabled) {
+//		mBehavior = enabled ? ofxDatGuiDropdownBehavior::RadioStaysOpen
+//							: ofxDatGuiDropdownBehavior::SelectCloses;
+//
+//		if (mUseToggleChildren && enabled) {
+//			rebuildAs(true);
+//		} else if (mUseToggleChildren && !enabled) {
+//			rebuildAs(false);
+//		} else {
+//			for (int i = 0; i < (int)children.size(); ++i) {
+//				auto * opt = static_cast<ofxDatGuiDropdownOption *>(children[i]);
+//				opt->setRadio(enabled);
+//				opt->setChecked(enabled && (i == mOption));
+//			}
+//		}
+//	}
+//
+//	bool isRadioMode() const { return mBehavior == ofxDatGuiDropdownBehavior::RadioStaysOpen; }
+//
+//	void onToggleSelected(ofxDatGuiToggleEvent e) {
+//		int clicked = mOption;
+//		for (int i = 0; i < (int)children.size(); ++i) {
+//			if (e.target == children[i]) {
+//				clicked = i;
+//				break;
+//			}
+//		}
+//		select(clicked);
+//	}
+//
+//private:
+//	void onOptionSelected(ofxDatGuiButtonEvent e) {
+//		int clicked = mOption;
+//		for (int i = 0; i < (int)children.size(); i++)
+//			if (e.target == children[i]) {
+//				clicked = i;
+//				break;
+//			}
+//		select(clicked);
+//	}
+//
+//	void rebuildAs(bool useToggles) {
+//		std::vector<std::string> labels;
+//		labels.reserve(children.size());
+//		for (auto * c : children)
+//			labels.push_back(c->getLabel());
+//
+//		for (auto * c : children) {
+//			if (c->getType() != ofxDatGuiType::COLOR_PICKER) delete c;
+//		}
+//		children.clear();
+//
+//		for (int i = 0; i < (int)labels.size(); ++i) {
+//			if (useToggles) {
+//				auto * t = new ofxDatGuiToggle(labels[i], i == mOption);
+//				t->setIndex((int)children.size());
+//				t->onToggleEvent(this, &ofxDatGuiDropdown::onToggleSelected);
+//				children.push_back(t);
+//			} else {
+//				auto * opt = new ofxDatGuiDropdownOption(labels[i]);
+//				opt->setIndex((int)children.size());
+//				opt->onButtonEvent(this, &ofxDatGuiDropdown::onOptionSelected);
+//				if (isRadioMode()) opt->setRadio(true);
+//				children.push_back(opt);
+//			}
+//		}
+//
+//		setTheme(ofxDatGuiComponent::getTheme());
+//
+//		if (isRadioMode()) {
+//			for (int i = 0; i < (int)children.size(); ++i) {
+//				if (useToggles) {
+//					if (auto * t = dynamic_cast<ofxDatGuiToggle *>(children[i])) t->setChecked(i == mOption);
+//				} else {
+//					if (auto * o = dynamic_cast<ofxDatGuiDropdownOption *>(children[i])) o->setChecked(i == mOption);
+//				}
+//			}
+//		}
+//	}
+//
+//	bool mUseToggleChildren = true; // prefer real toggles in radio mode
+//
+//	int mOption = 0;
+//	ofxDatGuiDropdownBehavior mBehavior;
+//};

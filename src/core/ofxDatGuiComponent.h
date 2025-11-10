@@ -111,6 +111,11 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         bool mEnabled;
         bool mMouseOver;
         bool mMouseDown;
+
+		// LoopyDev - Global Click Capture
+		static void clearGlobalPressOwner();
+		static bool isAnyPressActive();
+
         ofRectangle mMask;
         ofxDatGuiType mType;
         ofxDatGuiAnchor mAnchor;
