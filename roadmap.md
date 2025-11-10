@@ -16,7 +16,7 @@
 
 **restructure**
 * ofxDatGuiGroups refractor
-    * Separate dropdowns from groups header ☑️
+    * Separate dropdowns from groups header ✅
 
 ### Upstream planned features & roadmap
 **features**
