@@ -1,23 +1,23 @@
 ### ofxDatGui-LoopyDev planned features & roadmap
 **features**
-* Horizontal GUI panel
+* Horizontal GUI panel ☑️
 
 **components**
-* Int slider
-* File/FolderPicker
-* Radio groups ☑️
-* ColorPicker++
-* CurveEditor
-* Cubic Bezier ☑️
+* Int slider ☑️
+* File/FolderPicker ☑️
+* Radio groups ✅
+* ColorPicker++ ☑️
+* CurveEditor ☑️
+* Cubic Bezier ✅️
 
 **bugfixes**
-* Prevent text straying outside of text input fields
-* Simpler focused text input field keypress capture 
-* Prevent click+drag from outside GUI affecting components ☑️
+* Prevent text straying outside of text input fields ☑️
+* Simpler focused text input field keypress capture ☑️
+* Prevent click+drag from outside GUI affecting components ✅
 
 **restructure**
 * ofxDatGuiGroups refractor
-    * Separate dropdowns from groups header
+    * Separate dropdowns from groups header ☑️
 
 ### Upstream planned features & roadmap
 **features**
