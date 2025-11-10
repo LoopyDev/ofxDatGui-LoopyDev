@@ -3,7 +3,6 @@
 * Horizontal GUI panel ☑️
 
 **components**
-* Int slider ☑️
 * File/FolderPicker ☑️
 * Radio groups ✅
 * ColorPicker++ ☑️
