@@ -5,6 +5,8 @@
 **components**
 * File/FolderPicker ☑️
 * Radio groups ✅
+    * 'Hide header' option ✅
+    * 'Collapsible header' option ☑️
 * ColorPicker++ ☑️
 * CurveEditor ☑️
 * Cubic Bezier ✅️

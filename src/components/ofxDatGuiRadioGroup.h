@@ -1,30 +1,47 @@
 #pragma once
 #include "ofxDatGuiComponent.h"
-#include "ofxDatGuiControls.h" // where ofxDatGuiToggle lives
+#include "ofxDatGuiControls.h"
 #include "ofxDatGuiEvents.h"
 
+// Radio-style group: one selected option at a time.
+// Header can be shown/hidden; options area is always expanded.
 class ofxDatGuiRadioGroup : public ofxDatGuiComponent {
 public:
 	ofxDatGuiRadioGroup(const std::string & label, const std::vector<std::string> & options)
-		: ofxDatGuiComponent(label) {
-		mType = ofxDatGuiType::RADIO_GROUP; // whatever enum you use for this
-		mSelected = -1;
-
-		// Build options as toggles
+		: ofxDatGuiComponent(label)
+		, mSelected(-1)
+		, mHeaderVisible(true) {
+		mType = ofxDatGuiType::RADIO_GROUP;
 		for (auto & s : options)
 			addOption(s);
-
-		// Ensure fonts, colors, metrics are ready NOW (and propagate to children)
 		setTheme(ofxDatGuiComponent::getTheme());
 	}
 
 	static ofxDatGuiRadioGroup * getInstance() { return new ofxDatGuiRadioGroup("X", {}); }
 
+	// Header visibility (collapses/restore header hit area)
+	void setHeaderVisible(bool visible) {
+		if (mHeaderVisible == visible) return;
+		mHeaderVisible = visible;
+
+		if (!mHeaderVisible) {
+			if (mHeaderHeightCache < 0) mHeaderHeightCache = mStyle.height;
+			mStyle.height = 0; // hide header hit area
+		} else {
+			if (mStyle.height == 0) {
+				int fallback = ofxDatGuiComponent::getTheme()->layout.height;
+				mStyle.height = (mHeaderHeightCache > 0) ? mHeaderHeightCache : fallback;
+			}
+		}
+		layoutChildren();
+	}
+	bool isHeaderVisible() const { return mHeaderVisible; }
+	void hideHeader(bool hide = true) { setHeaderVisible(!hide); }
+
 	ofxDatGuiToggle * addOption(const std::string & label) {
 		auto * t = new ofxDatGuiToggle(label, false);
 		t->setStripeVisible(false);
 		t->onToggleEvent(this, &ofxDatGuiRadioGroup::onOptionToggled);
-		// theme gets pushed in setTheme(); safe if nullptr for now
 		children.push_back(t);
 		mOptions.push_back(t);
 		layoutChildren();
@@ -48,14 +65,12 @@ public:
 		return (mSelected >= 0 && mSelected < (int)mOptions.size()) ? mOptions[mSelected]->getLabel() : "";
 	}
 
-	// ----- required & common overrides -----
-
+	// ---- ofxDatGuiComponent overrides ----
 	void setTheme(const ofxDatGuiTheme * t) override {
-		// Apply to this component (sets mFont, sizes, margins, etc.)
-		setComponentStyle(t); // calls children[i]->setTheme(t) internally
+		setComponentStyle(t);
+		if (!mHeaderVisible) mStyle.height = 0;
 		layoutChildren();
 	}
-
 
 	void setWidth(int width, float labelWidth = 1.f) override {
 		ofxDatGuiComponent::setWidth(width, labelWidth);
@@ -70,13 +85,13 @@ public:
 	}
 
 	int getHeight() override {
-		int h = mStyle.height;
+		int h = mHeaderVisible ? mStyle.height : 0;
 		for (auto * opt : mOptions)
 			h += opt->getHeight();
 		return h;
 	}
 
-	bool getIsExpanded() override { return true; } // radio group is always expanded
+	bool getIsExpanded() override { return true; }
 
 	void update(bool acceptEvents = true) override {
 		ofxDatGuiComponent::update(acceptEvents);
@@ -87,31 +102,37 @@ public:
 	void draw() override {
 		if (!mVisible) return;
 		drawBackground();
-		drawLabel();
-		drawStripe();
+		if (mHeaderVisible) {
+			drawLabel();
+			drawStripe();
+		}
 		for (auto * opt : mOptions)
 			opt->draw();
 	}
 
-	// event registration
+	// Event hookup
 	template <typename T>
 	void onRadioGroupEvent(T * listener, void (T::*handler)(ofxDatGuiRadioGroupEvent)) {
 		mEventCallback = std::bind(handler, listener, std::placeholders::_1);
 	}
 
 private:
+	int mHeaderHeightCache = -1;
 	std::vector<ofxDatGuiToggle *> mOptions;
 	int mSelected;
+	bool mHeaderVisible;
 	std::function<void(ofxDatGuiRadioGroupEvent)> mEventCallback;
 
-void layoutChildren() {
-		int cursorY = this->y + mStyle.height;
+	void layoutChildren() {
+		int cursorY = this->y + (mHeaderVisible ? mStyle.height : 0);
 		for (auto * opt : mOptions) {
 			opt->setLabelAlignment(mLabel.alignment);
 			opt->setPosition(this->x, cursorY);
+			opt->setWidth(mStyle.width, mLabel.width);
 			cursorY += opt->getHeight();
 		}
 	}
+
 	void onOptionToggled(ofxDatGuiToggleEvent e) {
 		int idx = -1;
 		for (int i = 0; i < (int)mOptions.size(); ++i)
@@ -127,8 +148,7 @@ void layoutChildren() {
 				mOptions[i]->setChecked(i == idx);
 			dispatch();
 		} else {
-			// maintain radio semantics
-			mOptions[idx]->setChecked(true);
+			mOptions[idx]->setChecked(true); // keep radio semantics
 		}
 	}
 
