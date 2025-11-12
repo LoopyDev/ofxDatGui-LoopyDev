@@ -10,6 +10,7 @@
 * ColorPicker++ ☑️
 * CurveEditor ☑️
 * Cubic Bezier ✅️
+    - Cubic Bezier Curve getters ☑️
 
 **bugfixes**
 * Prevent text straying outside of text input fields ☑️
