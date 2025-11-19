@@ -631,6 +631,17 @@ ofxDatGuiRadioGroup * ofxDatGui::getRadioGroup(string rl) {
 	return o;
 }
 
+ofxDatGuiButtonBar * ofxDatGui::getButtonBar(string bl) {
+	auto * o = static_cast<ofxDatGuiButtonBar *>(getComponent(ofxDatGuiType::BUTTON_BAR, bl));
+	if (o == nullptr) {
+		o = ofxDatGuiButtonBar::getInstance();
+		ofxDatGuiLog::write(ofxDatGuiMsg::COMPONENT_NOT_FOUND, bl);
+		trash.push_back(o);
+	}
+	return o;
+}
+
+
 ofxDatGuiFolder* ofxDatGui::getFolder(string fl)
 {
     ofxDatGuiFolder* o = static_cast<ofxDatGuiFolder*>(getComponent(ofxDatGuiType::FOLDER, fl));
@@ -965,3 +976,19 @@ void ofxDatGui::onWindowResized(ofResizeEventArgs &e)
 }
 
 
+ofxDatGuiButtonBar * ofxDatGui::addButtonBar(const std::string & label,
+	const std::vector<std::string> & buttons) {
+	auto * bar = new ofxDatGuiButtonBar(label, buttons);
+
+	// Wire each inner button into the gui's normal button callback,
+	// so they behave like regular top-level buttons.
+	for (auto * child : bar->children) {
+		if (child->getType() == ofxDatGuiType::BUTTON) {
+			auto * btn = static_cast<ofxDatGuiButton *>(child);
+			btn->onButtonEvent(this, &ofxDatGui::onButtonEventCallback);
+		}
+	}
+
+	attachItem(bar);
+	return bar;
+}

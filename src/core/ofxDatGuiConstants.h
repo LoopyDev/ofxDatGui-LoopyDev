@@ -75,7 +75,8 @@ enum class ofxDatGuiType
 	// LoopyDev's additions
 	CUBIC_BEZIER,
 	RADIO_GROUP,
-	CURVE_EDITOR
+	CURVE_EDITOR,
+	BUTTON_BAR
 };
 
 

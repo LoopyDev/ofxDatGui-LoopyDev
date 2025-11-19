@@ -25,6 +25,8 @@
 #include "ofxDatGuiDropdown.h"
 // LoopyDev's Additions
 //#include "ofxDatGuiRadioGroup.h"
+#include "ofxDatGuiButtonBar.h"
+
 
 class ofxDatGui : public ofxDatGuiInteractiveObject
 {
@@ -102,6 +104,9 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 			attachItem(curve);
 			return curve;
 		};
+		// --- NEW: horizontal button bar ---
+		ofxDatGuiButtonBar * addButtonBar(const std::string & label,
+			const std::vector<std::string> & buttons);
     
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();
@@ -119,6 +124,8 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         ofxDatGuiDropdown* getDropdown(string label);
 		// LoopyDev: get Radio Groups
 		ofxDatGuiRadioGroup * getRadioGroup(string label);
+		// LoopyDev: get Button Bars
+		ofxDatGuiButtonBar * getButtonBar(string label);
 
     private:
     
