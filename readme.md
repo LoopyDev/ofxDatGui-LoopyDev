@@ -20,3 +20,14 @@
 - Curve Editor
 
 ![ofxDatGui-LoopyDev](https://loopydev.co.uk/img/software/ofxDatGui-LoopyDev/gallery/1.webp "ofxDatGui-LoopyDev")  
+
+Temp:
+Restructuring horizontally stacked gui components. To add a horizontally stacked GUI panel:
+
+	gui = new ofxDatGui(ofxDatGuiAnchor::TOP_LEFT);
+	gui->setWidth(ofGetWidth());
+	auto * row = gui->addPanel(ofxDatGuiPanel::Orientation::HORIZONTAL);
+	row->attachItem(new ofxDatGuiButton("Play"));
+	row->attachItem(new ofxDatGuiButton("Pause"));
+	row->attachItem(new ofxDatGuiButton("Stop"));
+	row->attachItem(new ofxDatGuiButton("Okeyyeh"));

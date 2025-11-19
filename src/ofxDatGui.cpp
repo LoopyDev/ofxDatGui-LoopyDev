@@ -426,6 +426,25 @@ ofxDatGuiFolder* ofxDatGui::addFolder(ofxDatGuiFolder* folder)
     return folder;
 }
 
+// ofxDatGui.cpp
+
+ofxDatGuiPanel * ofxDatGui::addPanel(ofxDatGuiPanel::Orientation orientation) {
+	auto * panel = new ofxDatGuiPanel(orientation);
+
+	// Use the global default theme – it's always valid.
+	panel->setTheme(ofxDatGuiComponent::getTheme());
+
+	// Match the gui’s current width so the panel knows its row size.
+	panel->setWidth(mWidth, mLabelWidth);
+
+	// Let the gui do the usual wiring (index, internal events, layout, etc).
+	attachItem(panel);
+
+	return panel;
+}
+
+
+
 void ofxDatGui::attachItem(ofxDatGuiComponent* item)
 {
     if (mGuiFooter != nullptr){

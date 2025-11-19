@@ -26,6 +26,7 @@
 // LoopyDev's Additions
 //#include "ofxDatGuiRadioGroup.h"
 #include "ofxDatGuiButtonBar.h"
+#include "ofxDatGuiPanel.h"
 
 
 class ofxDatGui : public ofxDatGuiInteractiveObject
@@ -104,10 +105,12 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 			attachItem(curve);
 			return curve;
 		};
-		// --- NEW: horizontal button bar ---
+		// --- LoopyDev: add horizontal button bar ---
 		ofxDatGuiButtonBar * addButtonBar(const std::string & label,
 			const std::vector<std::string> & buttons);
-    
+		// LoopyDev: add panel
+		ofxDatGuiPanel * addPanel(ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
+
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();
         ofxDatGuiLabel* getLabel(string label, string folder = "");

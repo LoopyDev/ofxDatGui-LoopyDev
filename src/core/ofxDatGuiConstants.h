@@ -76,7 +76,8 @@ enum class ofxDatGuiType
 	CUBIC_BEZIER,
 	RADIO_GROUP,
 	CURVE_EDITOR,
-	BUTTON_BAR
+	BUTTON_BAR,
+	PANEL
 };
 
 
