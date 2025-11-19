@@ -14,7 +14,9 @@
 - Mouse capture - prevents control when dragging clicked mouse over GUI
 - Folder nesting
 ### New components!
+- Horizontal button bar/radio group (it's a bit messy right now but it works, expect changes)
 - Cubic Bezier
 - Radio Group
+- Curve Editor
 
 ![ofxDatGui-LoopyDev](https://loopydev.co.uk/img/software/ofxDatGui-LoopyDev/gallery/1.webp "ofxDatGui-LoopyDev")  
