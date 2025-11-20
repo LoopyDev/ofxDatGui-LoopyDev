@@ -26,7 +26,16 @@
 class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
 {
     public:
-    
+
+		// LoopyDev: Stripe config
+		// Where the stripe is drawn around the component.
+		enum class StripePosition {
+			LEFT,
+			RIGHT,
+			TOP,
+			BOTTOM
+		};
+
         ofxDatGuiComponent(string label);
         virtual ~ofxDatGuiComponent();
     
@@ -54,7 +63,13 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         void    setStripeWidth(int width);
         void    setStripeColor(ofColor color);
         void    setStripeVisible(bool visible);
-    
+		// LoopyDev: Stripe config
+		void setStripePosition(StripePosition position);
+		StripePosition getStripePosition() const;
+		ofColor getStripeColor() const { return mStyle.stripe.color; }
+		int getStripeWidth() const { return mStyle.stripe.width; }
+		bool getStripeVisible() const { return mStyle.stripe.visible; }
+
         void    setBorder(ofColor color, int width);
         void    setBorderVisible(bool visible);
     
@@ -138,11 +153,12 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
                 bool visible;
                 ofColor color;
             } border;
-            struct{
-                int width;
-                bool visible;
-                ofColor color;
-            } stripe;
+			struct {
+				int width;
+				bool visible;
+				ofColor color;
+				StripePosition position;
+			} stripe;
             ofColor guiBackground;
         } mStyle;
     

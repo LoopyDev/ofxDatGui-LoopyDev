@@ -106,6 +106,7 @@ void ofxDatGuiComponent::setComponentStyle(const ofxDatGuiTheme* theme)
     mStyle.color.onMouseDown = theme->color.backgroundOnMouseDown;
     mStyle.stripe.width = theme->stripe.width;
     mStyle.stripe.visible = theme->stripe.visible;
+	mStyle.stripe.position = StripePosition::LEFT; // preserve original behaviour
     mStyle.border.width = theme->border.width;
     mStyle.border.color = theme->border.color;
     mStyle.border.visible = theme->border.visible;
@@ -346,6 +347,16 @@ void ofxDatGuiComponent::setStripeVisible(bool visible)
     mStyle.stripe.visible = visible;
 }
 
+// LoopyDev: Stripe config
+void ofxDatGuiComponent::setStripePosition(StripePosition position) {
+	mStyle.stripe.position = position;
+}
+
+ofxDatGuiComponent::StripePosition ofxDatGuiComponent::getStripePosition() const {
+	return mStyle.stripe.position;
+}
+
+
 void ofxDatGuiComponent::setBorder(ofColor color, int width)
 {
     mStyle.border.color = color;
@@ -463,11 +474,36 @@ void ofxDatGuiComponent::drawLabel()
     }
 }
 
-void ofxDatGuiComponent::drawStripe()
-{
-    ofSetColor(mStyle.stripe.color);
-    ofDrawRectangle(x, y, mStyle.stripe.width, mStyle.height);
+//void ofxDatGuiComponent::drawStripe()
+//{
+//    ofSetColor(mStyle.stripe.color);
+//    ofDrawRectangle(x, y, mStyle.stripe.width, mStyle.height);
+//}
+void ofxDatGuiComponent::drawStripe() {
+	if (!mStyle.stripe.visible || mStyle.stripe.width <= 0) return;
+
+	ofSetColor(mStyle.stripe.color);
+	int w = mStyle.stripe.width;
+
+	switch (mStyle.stripe.position) {
+	case StripePosition::LEFT:
+		ofDrawRectangle(x, y, w, mStyle.height);
+		break;
+
+	case StripePosition::RIGHT:
+		ofDrawRectangle(x + mStyle.width - w, y, w, mStyle.height);
+		break;
+
+	case StripePosition::TOP:
+		ofDrawRectangle(x, y, mStyle.width, w);
+		break;
+
+	case StripePosition::BOTTOM:
+		ofDrawRectangle(x, y + mStyle.height - w, mStyle.width, w);
+		break;
+	}
 }
+
 
 void ofxDatGuiComponent::drawBorder()
 {

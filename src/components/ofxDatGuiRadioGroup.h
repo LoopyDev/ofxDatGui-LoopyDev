@@ -7,10 +7,18 @@
 // Header can be shown/hidden; options area is always expanded.
 class ofxDatGuiRadioGroup : public ofxDatGuiComponent {
 public:
+	enum class Orientation {
+		VERTICAL,
+		HORIZONTAL
+	};
+
+
 	ofxDatGuiRadioGroup(const std::string & label, const std::vector<std::string> & options)
 		: ofxDatGuiComponent(label)
 		, mSelected(-1)
-		, mHeaderVisible(true) {
+		, mHeaderVisible(true)
+		, mOrientation(Orientation::VERTICAL) // <- NEW
+	{
 		mType = ofxDatGuiType::RADIO_GROUP;
 		for (auto & s : options)
 			addOption(s);
@@ -18,6 +26,15 @@ public:
 	}
 
 	static ofxDatGuiRadioGroup * getInstance() { return new ofxDatGuiRadioGroup("X", {}); }
+
+	    void setOrientation(Orientation orientation) {
+		if (mOrientation == orientation) return;
+		mOrientation = orientation;
+		layoutChildren(); // recompute positions
+	}
+
+	Orientation getOrientation() const { return mOrientation; }
+
 
 	// Header visibility (collapses/restore header hit area)
 	void setHeaderVisible(bool visible) {
@@ -84,12 +101,27 @@ public:
 		layoutChildren();
 	}
 
-	int getHeight() override {
+	    int getHeight() override {
 		int h = mHeaderVisible ? mStyle.height : 0;
-		for (auto * opt : mOptions)
-			h += opt->getHeight();
+
+		if (mOptions.empty()) {
+			return h;
+		}
+
+		if (mOrientation == Orientation::VERTICAL) {
+			for (auto * opt : mOptions)
+				h += opt->getHeight();
+		} else {
+			// HORIZONTAL: one row, take max option height
+			int rowHeight = 0;
+			for (auto * opt : mOptions)
+				rowHeight = std::max(rowHeight, opt->getHeight());
+			h += rowHeight;
+		}
+
 		return h;
 	}
+
 
 	bool getIsExpanded() override { return true; }
 
@@ -117,21 +149,56 @@ public:
 	}
 
 private:
+	Orientation mOrientation;
 	int mHeaderHeightCache = -1;
 	std::vector<ofxDatGuiToggle *> mOptions;
 	int mSelected;
 	bool mHeaderVisible;
 	std::function<void(ofxDatGuiRadioGroupEvent)> mEventCallback;
 
-	void layoutChildren() {
-		int cursorY = this->y + (mHeaderVisible ? mStyle.height : 0);
-		for (auto * opt : mOptions) {
-			opt->setLabelAlignment(mLabel.alignment);
-			opt->setPosition(this->x, cursorY);
-			opt->setWidth(mStyle.width, mLabel.width);
-			cursorY += opt->getHeight();
+	    void layoutChildren() {
+		if (mOptions.empty()) return;
+
+		const int headerH = mHeaderVisible ? mStyle.height : 0;
+
+		if (mOrientation == Orientation::VERTICAL) {
+			// Original behaviour: stack options downwards
+			int cursorY = this->y + headerH;
+			for (auto * opt : mOptions) {
+				opt->setLabelAlignment(mLabel.alignment);
+				opt->setPosition(this->x, cursorY);
+				opt->setWidth(mStyle.width, mLabel.width);
+				cursorY += opt->getHeight();
+			}
+		} else {
+			// HORIZONTAL: options laid out in a single row
+			int count = static_cast<int>(mOptions.size());
+			if (count <= 0) return;
+
+			int availableWidth = mStyle.width;
+			if (availableWidth <= 0) availableWidth = mStyle.width; // sanity
+
+			int spacing = mStyle.vMargin; // reuse vMargin horizontally
+			int totalSpacing = spacing * std::max(0, count - 1);
+
+			int optWidth = (availableWidth - totalSpacing) / std::max(1, count);
+			if (optWidth < 1) optWidth = 1;
+
+			int cursorX = this->x;
+			int baseY = this->y + headerH;
+
+			for (int i = 0; i < count; ++i) {
+				auto * opt = mOptions[i];
+				opt->setLabelAlignment(mLabel.alignment);
+				opt->setWidth(optWidth, mLabel.width);
+				opt->setPosition(cursorX, baseY);
+
+				cursorX += optWidth;
+				if (i + 1 < count) cursorX += spacing;
+			}
 		}
 	}
+
 
 	void onOptionToggled(ofxDatGuiToggleEvent e) {
 		int idx = -1;
