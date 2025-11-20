@@ -50,8 +50,21 @@ public:
 	void setOrientation(Orientation orientation) {
 		if (mOrientation == orientation) return;
 		mOrientation = orientation;
+
+		// When horizontal, stripes along the bottom of children.
+		// When vertical, stripes along the left (default).
+		for (auto * c : children) {
+			if (!c) continue;
+			if (mOrientation == Orientation::HORIZONTAL) {
+				c->setStripePosition(ofxDatGuiComponent::StripePosition::BOTTOM);
+			} else {
+				c->setStripePosition(ofxDatGuiComponent::StripePosition::LEFT);
+			}
+		}
+
 		layout();
 	}
+
 
 	Orientation getOrientation() const { return mOrientation; }
 
@@ -64,7 +77,7 @@ public:
 			theme = ofxDatGuiComponent::getTheme();
 		}
 
-		// Use theme only to pick up spacing & font etc.
+		// Use theme to pick up spacing & style.
 		setComponentStyle(theme);
 		mSpacing = theme->layout.vMargin;
 
@@ -111,22 +124,50 @@ public:
 	}
 
 	void update(bool acceptEvents = true) override {
-		// Let the base class handle focus, mouse, keyboard, etc.
+		// Panels are layout-only containers; we don't want them to
+		// steal mouse presses from their children. The base
+		// ofxDatGuiComponent::update() uses mStyle.height as a
+		// "header" height for containers (anything below that is
+		// treated as child region and should belong to children).
+		//
+		// Our panel places children starting at y (no header),
+		// so we temporarily collapse the header height to zero
+		// while running the base event logic.
+
+		float oldHeight = mStyle.height;
+		mStyle.height = 0;
+
 		ofxDatGuiComponent::update(acceptEvents);
-		// Base update already walks our children via getIsExpanded()==true,
-		// so we don't need to manually loop children here.
+
+		// Restore whatever height the theme/layout wants to use
+		// for drawing / layout purposes.
+		mStyle.height = oldHeight;
 	}
+
 
 	void draw() override {
 		if (!mVisible) return;
 
-		// By default, panel is just a transparent container.
-		// If you want a framed look, you could call drawBackground()/drawBorder() here.
+		ofPushStyle();
+		// Panel itself stays visually transparent by default.
+		// If you ever want a framed block, uncomment:
+		// drawBackground();
+		// drawBorder();
+
 		for (auto * c : children) {
-			if (c->getVisible()) {
-				c->draw();
+			if (!c->getVisible()) continue;
+
+			// Let the child draw itself first
+			c->draw();
+
+			// In horizontal mode, draw a bottom stripe for each child,
+			// using THIS PANEL's stripe style (just like ButtonBar).
+			if (mOrientation == Orientation::HORIZONTAL) {
+				drawChildBottomStripe(c);
 			}
 		}
+
+		ofPopStyle();
 	}
 
 	// ---------------------------------------------------------------------
@@ -140,11 +181,19 @@ public:
 		if (!item) return;
 
 		item->setIndex(static_cast<int>(children.size()));
-		// Route child internal events via this panel first.
+
+		// Make new kids follow the panel’s current stripe orientation
+		if (mOrientation == Orientation::HORIZONTAL) {
+			item->setStripePosition(ofxDatGuiComponent::StripePosition::BOTTOM);
+		} else {
+			item->setStripePosition(ofxDatGuiComponent::StripePosition::LEFT);
+		}
+
 		item->onInternalEvent(this, &ofxDatGuiPanel::onInternalChildEvent);
 		children.push_back(item);
 		layout();
 	}
+
 
 	// Read-only access to children if you ever need to poke from outside.
 	const std::vector<ofxDatGuiComponent *> & getChildren() const {
@@ -193,12 +242,13 @@ protected:
 			}
 
 			int availableWidth = mStyle.width;
+			const int spacing = mSpacing;
+
 			if (availableWidth <= 0) {
 				// Fallback: at least make them butt up against each other
 				// using their own widths.
 				int cursorX = x;
 				int rowHeight = 0;
-				const int spacing = mSpacing;
 
 				for (auto * c : visible) {
 					c->setPosition(cursorX, y);
@@ -210,7 +260,6 @@ protected:
 				return;
 			}
 
-			const int spacing = mSpacing;
 			const int count = static_cast<int>(visible.size());
 			const int totalSpacing = spacing * std::max(0, count - 1);
 			int childWidth = (availableWidth - totalSpacing) / std::max(1, count);
@@ -248,6 +297,26 @@ protected:
 			internalEventCallback(e);
 		}
 	}
+
+	// Draw a horizontal stripe at the bottom edge of the given child,
+	// using this panel's stripe style, similar to ofxDatGuiButtonBar.
+	void drawChildBottomStripe(ofxDatGuiComponent * child) {
+		if (!child) return;
+		if (!child->getStripeVisible()) return;
+
+		float stripeH = static_cast<float>(child->getStripeWidth());
+		if (stripeH <= 0.f) return;
+
+		float sx = static_cast<float>(child->getX());
+		float sw = static_cast<float>(child->getWidth());
+		float sy = static_cast<float>(child->getY() + child->getHeight()) - stripeH;
+
+		if (sw <= 0.f) return;
+
+		ofSetColor(child->getStripeColor()); // <-- use child color
+		ofDrawRectangle(sx, sy, sw, stripeH);
+	}
+
 
 	Orientation mOrientation;
 	int mHeight;
