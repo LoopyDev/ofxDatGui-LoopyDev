@@ -13,7 +13,7 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 ## ?? Goals
 
-- [ ] Have **one root GUI** per app (`ofxDatGui` as “GuiRoot”).
+- [ ] Have **one root GUI** per app (`ofxDatGui` as ï¿½GuiRootï¿½).
 - [ ] Introduce a clean **Container vs Leaf** hierarchy.
 - [ ] Remove fragile **global/static state** for input where possible.
 - [ ] Use **RAII / `std::unique_ptr`** for component ownership.
@@ -22,20 +22,20 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 ---
 
-## Phase 0 – Safety Net & Minimal Example
+## Phase 0 ï¿½ Safety Net & Minimal Example
 
-- [ ] Create a **minimal test app** (e.g. `example-refactor`):
-  - [ ] One `ofxDatGui` instance.
-  - [ ] A few folders, sliders, toggles.
-  - [ ] Basic hover / press / drag / expand-collapse behaviour.
-  - [ ] A simple “page” concept (switching between groups/panels).
-- [ ] Use this app to quickly spot breaks after each refactor step.
+- [x] Create a **minimal test app** (e.g. `example-refractor`):
+  - [x] One `ofxDatGui` instance.
+  - [x] A few folders, sliders, toggles.
+  - [x] Basic hover / press / drag / expand-collapse behaviour.
+  - [x] A simple ï¿½pageï¿½ concept (switching between groups/panels).
+- [x] Use this app to quickly spot breaks after each refactor step.
 
 ---
 
-## Phase 1 – Introduce `ofxDatGuiContainer` (Common Container Base)
+## Phase 1 ï¿½ Introduce `ofxDatGuiContainer` (Common Container Base)
 
-**Goal:** unify all “things that own children” behind a single base class.
+**Goal:** unify all ï¿½things that own childrenï¿½ behind a single base class.
 
 - [ ] Add `ofxDatGuiContainer`:
   - [ ] `src/core/ofxDatGuiContainer.h` (and `.cpp`):
@@ -52,12 +52,12 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 - [ ] Refactor **existing child management**:
   - [ ] Replace ad-hoc `attachItem(...)`-style child vectors in `Panel` with `addChild<>()` + `children`.
   - [ ] Same for `Folder` (or at least route it through `ofxDatGuiContainer` internally).
-  - [ ] Move generic “update children / draw children” logic into `ofxDatGuiContainer`.
-- [ ] Keep `ofxDatGui`’s `items` vector unchanged for now (raw pointers are fine here temporarily).
+  - [ ] Move generic ï¿½update children / draw childrenï¿½ logic into `ofxDatGuiContainer`.
+- [ ] Keep `ofxDatGui`ï¿½s `items` vector unchanged for now (raw pointers are fine here temporarily).
 
 ---
 
-## Phase 2 – Per-Root Mouse Capture & Root Back-Pointers
+## Phase 2 ï¿½ Per-Root Mouse Capture & Root Back-Pointers
 
 **Goal:** input and mouse capture are managed per root GUI, not via global statics.
 
@@ -68,7 +68,7 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 - [ ] Ensure the root pointer is propagated:
   - [ ] In `ofxDatGui::addXxx(...)`, after creating a component, call `component->setRoot(this);`
   - [ ] In `ofxDatGuiContainer::addChild`, propagate the root to children:
-    - [ ] When the container’s root changes, update all children recursively.
+    - [ ] When the containerï¿½s root changes, update all children recursively.
 - [ ] Add **mouse capture owner** to `ofxDatGui`:
   - [ ] In `ofxDatGui`:
     - [ ] `ofxDatGuiComponent* mouseCaptureOwner = nullptr;`
@@ -97,11 +97,11 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 - [ ] **De-fang multi-GUI focus switching**:
   - [ ] Find the block in `ofxDatGui::update()` that scans `mGuis` on mouse press to change `mActiveGui`.
   - [ ] Remove or disable it (comment out / guard with a flag).
-  - [ ] Commit to “one gui per window” as the normal usage.
+  - [ ] Commit to ï¿½one gui per windowï¿½ as the normal usage.
 
 ---
 
-## Phase 3 – Move to `std::unique_ptr` Ownership
+## Phase 3 ï¿½ Move to `std::unique_ptr` Ownership
 
 **Goal:** clear ownership; no leaks; fewer dangling pointers.
 
@@ -129,7 +129,7 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 ---
 
-## Phase 4 – Theme & Layout Responsibilities
+## Phase 4 ï¿½ Theme & Layout Responsibilities
 
 **Goal:** theme and layout are explicit, not magical.
 
@@ -151,7 +151,7 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 ---
 
-## Phase 5 – API Polish & “One Root, Many Panels” Pattern
+## Phase 5 ï¿½ API Polish & ï¿½One Root, Many Panelsï¿½ Pattern
 
 **Goal:** the public API matches how you actually want to use the addon.
 
@@ -165,17 +165,17 @@ Use this checklist as you refactor the addon. Tick things off as you go.
   - [ ] `ofxDatGuiButton* addButton(const std::string& label);`
   - [ ] Internally: use `addChild<>()` + proper ownership.
 - [ ] Update / add examples that:
-  - [ ] Show a **top navigation bar panel** with radio-group “pages”.
+  - [ ] Show a **top navigation bar panel** with radio-group ï¿½pagesï¿½.
   - [ ] Show multiple panels for different UI sections.
   - [ ] Demonstrate clean interaction (no double-click, no weird capture issues).
 - [ ] Update the README to:
   - [ ] Explain the root/container/leaf hierarchy.
-  - [ ] Recommend “one gui, many panels” as the default usage.
-  - [ ] Mark multi-root setups as “advanced / legacy” if still supported.
+  - [ ] Recommend ï¿½one gui, many panelsï¿½ as the default usage.
+  - [ ] Mark multi-root setups as ï¿½advanced / legacyï¿½ if still supported.
 
 ---
 
-## Phase 6 – `ofParameter` / `ofParameterGroup` Integration
+## Phase 6 ï¿½ `ofParameter` / `ofParameterGroup` Integration
 
 **Goal:** link widgets to actual app state via `ofParameter`, reduce manual sync code, and allow swapping GUI front-ends without touching logic.
 
@@ -208,7 +208,7 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 ### 6.3 Ensure lifetime & listener safety
 
-- [ ] Make sure widgets don’t outlive their `ofParameter`s:
+- [ ] Make sure widgets donï¿½t outlive their `ofParameter`s:
   - [ ] Document that parameters must exist as long as the GUI does.
   - [ ] (Optionally) use weak pointers / explicit `unbind()` if you want to be extra safe.
 - [ ] When destroying a widget:
@@ -223,23 +223,24 @@ Use this checklist as you refactor the addon. Tick things off as you go.
   - [ ] Build the GUI from the parameter group.
   - [ ] Use the parameters directly in `draw()` / `update()` (no manual copy from widgets).
 - [ ] Show both styles:
-  - [ ] “Classic” style (manual event handlers).
+  - [ ] ï¿½Classicï¿½ style (manual event handlers).
   - [ ] `ofParameter` style (state-driven, less glue code).
 
 ---
 
-## After Refactor – Nice-to-Haves (Optional)
+## After Refactor ï¿½ Nice-to-Haves (Optional)
 
 If you still have energy:
 
 - [ ] Add `std::function`-based callbacks in addition to / instead of global event listeners.
 - [ ] Add scoped connection helpers for `ofEvents` to avoid dangling event handlers.
-- [ ] Wrap example usage in a small helper API (e.g. “builder” functions) for even less boilerplate.
+- [ ] Wrap example usage in a small helper API (e.g. ï¿½builderï¿½ functions) for even less boilerplate.
 
 ---
 
 You can drop this into `REFACTOR_ROADMAP.md` or merge into your main `README.md` and tick things off as you go, e.g.:
 
-- [x] Phase 1 – Container base (done 2025-11-21)
-- [ ] Phase 2 – Mouse capture per root
-- [ ] Phase 6 – ofParameter integration
+- [x] Phase 0 Safety Net & Minimal Example (done 2025-01-XX)
+- [ ] Phase 1 ï¿½ Container base (done 2025-11-21)
+- [ ] Phase 2 ï¿½ Mouse capture per root
+- [ ] Phase 6 ï¿½ ofParameter integration
