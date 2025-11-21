@@ -1,4 +1,4 @@
-/*
+ï»¿/*
     Copyright (C) 2015 Stephen Braitsch [http://braitsch.io]
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -451,10 +451,10 @@ ofxDatGuiFolder* ofxDatGui::addFolder(ofxDatGuiFolder* folder)
 ofxDatGuiPanel * ofxDatGui::addPanel(ofxDatGuiPanel::Orientation orientation) {
 	auto * panel = new ofxDatGuiPanel(orientation);
 
-	// Use the global default theme – it's always valid.
+	// Use the global default theme â€“ it's always valid.
 	panel->setTheme(ofxDatGuiComponent::getTheme());
 
-	// Match the gui’s current width so the panel knows its row size.
+	// Match the guiâ€™s current width so the panel knows its row size.
 	panel->setWidth(mWidth, mLabelWidth);
 
 	// Let the gui do the usual wiring (index, internal events, layout, etc).
@@ -472,6 +472,7 @@ void ofxDatGui::attachItem(ofxDatGuiComponent* item)
     }   else {
         items.push_back( item );
     }
+    item->setRoot(this);
     item->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
     layoutGui();
 }
@@ -1141,3 +1142,4 @@ ofxDatGuiButtonBar * ofxDatGui::addButtonBar(const std::string & label,
 	attachItem(bar);
 	return bar;
 }
+

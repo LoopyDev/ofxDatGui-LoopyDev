@@ -1,13 +1,13 @@
 #pragma once
 
-#include "ofxDatGuiComponent.h"
+#include "ofxDatGuiContainer.h"
 #include "ofxDatGuiEvents.h"
 #include <algorithm>
 
 // Simple container panel that lays out its children either
 // vertically (one per row) or horizontally (in a single row).
 // Meant to be embedded inside folders/groups or used on its own.
-class ofxDatGuiPanel : public ofxDatGuiComponent {
+class ofxDatGuiPanel : public ofxDatGuiContainer {
 public:
 	// Layout direction for children.
 	enum class Orientation {
@@ -16,14 +16,14 @@ public:
 	};
 
 	explicit ofxDatGuiPanel(Orientation orientation = Orientation::VERTICAL)
-		: ofxDatGuiComponent("")
+		: ofxDatGuiContainer("")
 		, mOrientation(orientation)
 		, mHeight(0)
 		, mSpacing(0) {
 		mType = ofxDatGuiType::PANEL;
 
 		// Initialize spacing & base style from the global default theme
-		// so layout() has sane values even before setTheme() is called.
+		// so layoutChildren() has sane values even before setTheme() is called.
 		const ofxDatGuiTheme * t = ofxDatGuiComponent::getTheme();
 		if (t != nullptr) {
 			setComponentStyle(t);
@@ -31,17 +31,7 @@ public:
 		}
 	}
 
-	virtual ~ofxDatGuiPanel() {
-		// Mirror ofxDatGuiGroup / Folder semantics:
-		// delete non-color-picker children (color pickers are usually
-		// managed by shared_ptr in folders).
-		for (auto * c : children) {
-			if (c->getType() != ofxDatGuiType::COLOR_PICKER) {
-				delete c;
-			}
-		}
-		children.clear();
-	}
+	~ofxDatGuiPanel() override = default;
 
 	// ---------------------------------------------------------------------
 	// Orientation
@@ -53,7 +43,7 @@ public:
 
 		// When horizontal, stripes along the bottom of children.
 		// When vertical, stripes along the left (default).
-		for (auto * c : children) {
+		for (auto & c : children) {
 			if (!c) continue;
 			if (mOrientation == Orientation::HORIZONTAL) {
 				c->setStripePosition(ofxDatGuiComponent::StripePosition::BOTTOM);
@@ -62,7 +52,7 @@ public:
 			}
 		}
 
-		layout();
+		layoutChildren();
 	}
 
 
@@ -82,11 +72,11 @@ public:
 		mSpacing = theme->layout.vMargin;
 
 		// Propagate theme to children
-		for (auto * c : children) {
+		for (auto & c : children) {
 			c->setTheme(theme);
 		}
 
-		layout();
+		layoutChildren();
 	}
 
 	void setPosition(int px, int py) override {
@@ -94,7 +84,7 @@ public:
 		// auto-stack children vertically. We fully control child layout.
 		x = px;
 		y = py;
-		layout();
+		layoutChildren();
 	}
 
 	void setWidth(int width, float labelWidth = 1.f) override {
@@ -104,14 +94,14 @@ public:
 		//
 		// So: temporarily clear our children list, call base setWidth,
 		// then restore children and relayout.
-		auto savedChildren = children;
-		children.clear();
+		std::vector<ComponentPtr> savedChildren;
+		savedChildren.swap(children);
 
 		ofxDatGuiComponent::setWidth(width, labelWidth);
 
-		children = std::move(savedChildren);
+		children.swap(savedChildren);
 
-		layout();
+		layoutChildren();
 	}
 
 	int getHeight() override {
@@ -119,7 +109,7 @@ public:
 	}
 
 	bool getIsExpanded() override {
-		// Panels don’t implement collapse/expand; treat as always expanded.
+		// Panels don't implement collapse/expand; treat as always expanded.
 		return true;
 	}
 
@@ -142,6 +132,12 @@ public:
 		// Restore whatever height the theme/layout wants to use
 		// for drawing / layout purposes.
 		mStyle.height = oldHeight;
+
+		// Now update children with same enabled flag.
+		const bool enabled = acceptEvents && getEnabled();
+		for (auto & c : children) {
+			c->update(enabled);
+		}
 	}
 
 
@@ -154,7 +150,7 @@ public:
 		// drawBackground();
 		// drawBorder();
 
-		for (auto * c : children) {
+		for (auto & c : children) {
 			if (!c->getVisible()) continue;
 
 			// Let the child draw itself first
@@ -163,7 +159,7 @@ public:
 			// In horizontal mode, draw a bottom stripe for each child,
 			// using THIS PANEL's stripe style (just like ButtonBar).
 			if (mOrientation == Orientation::HORIZONTAL) {
-				drawChildBottomStripe(c);
+				drawChildBottomStripe(c.get());
 			}
 		}
 
@@ -175,14 +171,14 @@ public:
 	// ---------------------------------------------------------------------
 
 	// Attach an existing component as a child of this panel.
-	// The panel takes ownership and deletes it in the destructor
-	// (except for color pickers, matching folder/group semantics).
-	void attachItem(ofxDatGuiComponent * item) {
-		if (!item) return;
+	// Takes ownership via unique_ptr but returns raw pointer for convenience.
+	ofxDatGuiComponent * attachItem(ofxDatGuiComponent * item) {
+		if (!item) return nullptr;
 
 		item->setIndex(static_cast<int>(children.size()));
+		item->setRoot(getRoot());
 
-		// Make new kids follow the panel’s current stripe orientation
+		// Make new kids follow the panel's current stripe orientation
 		if (mOrientation == Orientation::HORIZONTAL) {
 			item->setStripePosition(ofxDatGuiComponent::StripePosition::BOTTOM);
 		} else {
@@ -190,13 +186,13 @@ public:
 		}
 
 		item->onInternalEvent(this, &ofxDatGuiPanel::onInternalChildEvent);
-		children.push_back(item);
-		layout();
+		emplaceChild(ComponentPtr(item));
+		return item;
 	}
 
 
 	// Read-only access to children if you ever need to poke from outside.
-	const std::vector<ofxDatGuiComponent *> & getChildren() const {
+	const std::vector<ComponentPtr> & getChildren() const {
 		return children;
 	}
 
@@ -205,7 +201,7 @@ protected:
 	// Layout
 	// ---------------------------------------------------------------------
 
-	void layout() {
+	void layoutChildren() override {
 		mHeight = 0;
 
 		if (children.empty()) {
@@ -216,7 +212,7 @@ protected:
 			int cursorY = y;
 			const int spacing = mSpacing;
 
-			for (auto * c : children) {
+			for (auto & c : children) {
 				if (!c->getVisible()) continue;
 				c->setPosition(x, cursorY);
 				cursorY += c->getHeight() + spacing;
@@ -232,8 +228,8 @@ protected:
 			// Horizontal row: try to keep everything inside our width.
 			std::vector<ofxDatGuiComponent *> visible;
 			visible.reserve(children.size());
-			for (auto * c : children) {
-				if (c->getVisible()) visible.push_back(c);
+			for (auto & c : children) {
+				if (c->getVisible()) visible.push_back(c.get());
 			}
 
 			if (visible.empty()) {
@@ -289,7 +285,7 @@ protected:
 	// Internal events coming from children (visibility changes, etc.).
 	void onInternalChildEvent(ofxDatGuiInternalEvent e) {
 		if (e.type == ofxDatGuiEventType::VISIBILITY_CHANGED) {
-			layout();
+			layoutChildren();
 		}
 
 		// Bubble the event up if someone is listening to this panel.
