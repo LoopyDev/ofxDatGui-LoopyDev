@@ -66,7 +66,9 @@ void ofxDatGui::init()
     mWidth = ofxDatGuiComponent::getTheme()->layout.width;
     mRowSpacing = ofxDatGuiComponent::getTheme()->layout.vMargin;
     mGuiBackground = ofxDatGuiComponent::getTheme()->color.guiBackground;
-    
+
+	mOrientation = Orientation::VERTICAL;
+
 // enable autodraw by default //
     setAutoDraw(true, mGuis.size());
     
@@ -140,6 +142,24 @@ void ofxDatGui::setWidth(int width, float labelWidth)
     mWidthChanged = true;
     if (mAnchor != ofxDatGuiAnchor::NO_ANCHOR) positionGui();
 }
+
+void ofxDatGui::setOrientation(Orientation orientation) {
+	if (mOrientation == orientation) return;
+	mOrientation = orientation;
+
+	// stripes autoflip:
+	// for (auto* item : items) {
+	//     if (!item) continue;
+	//     item->setStripePosition(
+	//         mOrientation == Orientation::HORIZONTAL ?
+	//             ofxDatGuiComponent::StripePosition::BOTTOM :
+	//             ofxDatGuiComponent::StripePosition::LEFT
+	//     );
+	// }
+
+	layoutGui();
+}
+
 
 void ofxDatGui::setTheme(ofxDatGuiTheme* t, bool applyImmediately)
 {
@@ -834,52 +854,123 @@ void ofxDatGui::moveGui(ofPoint pt)
     positionGui();
 }
 
-void ofxDatGui::layoutGui()
-{
-    mHeight = 0;
-    for (int i=0; i<items.size(); i++) {
-        items[i]->setIndex(i);
-    // skip over any components that are currently invisible //
-        if (items[i]->getVisible() == false) continue;
-        mHeight += items[i]->getHeight() + mRowSpacing;
-    }
-    positionGui();
+void ofxDatGui::layoutGui() {
+	// Always keep indices up to date
+	for (int i = 0; i < items.size(); i++) {
+		items[i]->setIndex(i);
+	}
+
+	// Collect visible items
+	std::vector<ofxDatGuiComponent *> visible;
+	visible.reserve(items.size());
+	for (auto * item : items) {
+		if (item->getVisible()) {
+			visible.push_back(item);
+		}
+	}
+
+	if (visible.empty()) {
+		mHeight = 0;
+		positionGui();
+		return;
+	}
+
+	if (mOrientation == Orientation::VERTICAL) {
+		// Original behaviour
+		mHeight = 0;
+		for (auto * item : visible) {
+			mHeight += item->getHeight() + mRowSpacing;
+		}
+	} else {
+		// HORIZONTAL: single "row" of items, width split across them.
+		int availableWidth = mWidth;
+		const int spacing = mRowSpacing;
+		const int count = static_cast<int>(visible.size());
+
+		const int totalSpacing = spacing * std::max(0, count - 1);
+		int childWidth = (availableWidth - totalSpacing) / std::max(1, count);
+		if (childWidth < 1) childWidth = 1;
+
+		int rowHeight = 0;
+		for (auto * c : visible) {
+			// Give each child an equal share of the width.
+			c->setWidth(childWidth, mLabelWidth);
+			rowHeight = std::max(rowHeight, c->getHeight());
+		}
+
+		// Match the vertical semantics: one row = child height + bottom margin.
+		mHeight = rowHeight + mRowSpacing;
+	}
+
+	positionGui();
 }
 
-void ofxDatGui::positionGui()
-{
-/*
-    ofGetWidth/ofGetHeight returns incorrect values after retina windows are resized in version 0.9.1 & 0.9.2
-    https://github.com/openframeworks/openFrameworks/pull/4858
-*/
-    int multiplier = 1;
-    if (ofxDatGuiIsHighResolution() && ofGetVersionMajor() == 0 && ofGetVersionMinor() == 9 && (ofGetVersionPatch() == 1 || ofGetVersionPatch() == 2)){
-        multiplier = 2;
-    }
-    if (mAnchor == ofxDatGuiAnchor::TOP_LEFT){
-        mPosition.y = 0;
-        mPosition.x = 0;
-    }   else if (mAnchor == ofxDatGuiAnchor::TOP_RIGHT){
-        mPosition.y = 0;
-        mPosition.x = (ofGetWidth() / multiplier) - mWidth;
-    }   else if (mAnchor == ofxDatGuiAnchor::BOTTOM_LEFT){
-        mPosition.x = 0;
-        mPosition.y = (ofGetHeight() / multiplier) - mHeight;
-    }   else if (mAnchor == ofxDatGuiAnchor::BOTTOM_RIGHT){
-        mPosition.x = (ofGetWidth() / multiplier) - mWidth;
-        mPosition.y = (ofGetHeight() / multiplier) - mHeight;
-    }
-    int h = 0;
-    for (int i=0; i<items.size(); i++) {
-    // skip over any components that are currently invisible //
-        if (items[i]->getVisible() == false) continue;
-        items[i]->setPosition(mPosition.x, mPosition.y + h);
-        h += items[i]->getHeight() + mRowSpacing;
-    }
-    // move the footer back to the top of the gui //
-    if (!mExpanded) mGuiFooter->setPosition(mPosition.x, mPosition.y);
-    mGuiBounds = ofRectangle(mPosition.x, mPosition.y, mWidth, mHeight);
+
+void ofxDatGui::positionGui() {
+	/*
+        ofGetWidth/ofGetHeight returns incorrect values after retina windows 
+        are resized in version 0.9.1 & 0.9.2
+        https://github.com/openframeworks/openFrameworks/pull/4858
+    */
+	int multiplier = 1;
+	if (ofxDatGuiIsHighResolution() && ofGetVersionMajor() == 0 && ofGetVersionMinor() == 9 && (ofGetVersionPatch() == 1 || ofGetVersionPatch() == 2)) {
+		multiplier = 2;
+	}
+
+	if (mAnchor == ofxDatGuiAnchor::TOP_LEFT) {
+		mPosition.y = 0;
+		mPosition.x = 0;
+	} else if (mAnchor == ofxDatGuiAnchor::TOP_RIGHT) {
+		mPosition.y = 0;
+		mPosition.x = (ofGetWidth() / multiplier) - mWidth;
+	} else if (mAnchor == ofxDatGuiAnchor::BOTTOM_LEFT) {
+		mPosition.x = 0;
+		mPosition.y = (ofGetHeight() / multiplier) - mHeight;
+	} else if (mAnchor == ofxDatGuiAnchor::BOTTOM_RIGHT) {
+		mPosition.x = (ofGetWidth() / multiplier) - mWidth;
+		mPosition.y = (ofGetHeight() / multiplier) - mHeight;
+	}
+
+	if (!mExpanded && mGuiFooter != nullptr) {
+		// Collapsed: footer only, same as before.
+		mGuiFooter->setPosition(mPosition.x, mPosition.y);
+		mGuiBounds = ofRectangle(mPosition.x, mPosition.y, mWidth, mGuiFooter->getHeight());
+		return;
+	}
+
+	// Expanded: place visible items according to orientation.
+	if (mOrientation == Orientation::VERTICAL) {
+		int h = 0;
+		for (int i = 0; i < items.size(); i++) {
+			if (!items[i]->getVisible()) continue;
+			items[i]->setPosition(mPosition.x, mPosition.y + h);
+			h += items[i]->getHeight() + mRowSpacing;
+		}
+	} else {
+		// HORIZONTAL
+		std::vector<ofxDatGuiComponent *> visible;
+		visible.reserve(items.size());
+		for (auto * item : items) {
+			if (item->getVisible()) visible.push_back(item);
+		}
+
+		int x = mPosition.x;
+		const int spacing = mRowSpacing;
+
+		for (int i = 0; i < visible.size(); ++i) {
+			auto * c = visible[i];
+			c->setPosition(x, mPosition.y);
+			x += c->getWidth();
+			if (i + 1 < visible.size()) {
+				x += spacing;
+			}
+		}
+	}
+
+	// Bounds use mWidth x mHeight (as computed by layoutGui)
+	mGuiBounds = ofRectangle(mPosition.x, mPosition.y, mWidth, mHeight);
 }
+
 
 /* 
     update & draw loop
@@ -917,18 +1008,20 @@ void ofxDatGui::update()
         }
     }
 
-    if (!getFocused() || !mEnabled){
-    // update children but ignore mouse & keyboard events //
-        for (int i=0; i<items.size(); i++) items[i]->update(false);
-    }   else {
-        mMoving = false;
-        mMouseDown = false;
-    // this gui has focus so let's see if any of its components were interacted with //
-        if (mExpanded == false){
-            mGuiFooter->update();
-            mMouseDown = mGuiFooter->getMouseDown();
+	if (!mEnabled) {
+		// disabled: no interaction
+		for (int i = 0; i < items.size(); i++)
+			items[i]->update(false);
+	} else {
+		mMoving = false;
+		mMouseDown = false;
+		// this gui is enabled, always allow mouse/keyboard to reach children
+		if (mExpanded == false) {
+			mGuiFooter->update();
+			mMouseDown = mGuiFooter->getMouseDown();
 		} else {
-			// 1) Update every item; sPressOwner in the component layer guarantees only the owner reacts.
+			// 1) Update every item; sPressOwner in the component layer
+			//    already guarantees only the owner reacts.
 			for (int i = 0; i < items.size(); ++i) {
 				items[i]->update(true);
 			}
@@ -945,17 +1038,54 @@ void ofxDatGui::update()
 				if (anyMouseDown(anyMouseDown, items[i])) mMouseDown = true;
 			}
 
-			// 3) Only drag the panel when the header itself is pressed (so other presses don't move it)
+			// 3) Only drag the panel when the header itself is pressed
 			if (mGuiHeader != nullptr && mGuiHeader->getDraggable() && mGuiHeader->getMouseDown()) {
 				mMoving = true;
 				ofPoint mouse(ofGetMouseX(), ofGetMouseY());
 				moveGui(mouse - mGuiHeader->getDragOffset());
 			}
-		
-
 		}
+	}
 
-    }
+  //  if (!getFocused() || !mEnabled){
+  //  // update children but ignore mouse & keyboard events //
+  //      for (int i=0; i<items.size(); i++) items[i]->update(false);
+  //  }   else {
+  //      mMoving = false;
+  //      mMouseDown = false;
+  //  // this gui has focus so let's see if any of its components were interacted with //
+  //      if (mExpanded == false){
+  //          mGuiFooter->update();
+  //          mMouseDown = mGuiFooter->getMouseDown();
+		//} else {
+		//	// 1) Update every item; sPressOwner in the component layer guarantees only the owner reacts.
+		//	for (int i = 0; i < items.size(); ++i) {
+		//		items[i]->update(true);
+		//	}
+
+		//	// 2) Panel-level mMouseDown = any descendant is down
+		//	auto anyMouseDown = [&](auto && self, ofxDatGuiComponent * node) -> bool {
+		//		if (node->getMouseDown()) return true;
+		//		for (auto * c : node->children)
+		//			if (self(self, c)) return true;
+		//		return false;
+		//	};
+		//	mMouseDown = false;
+		//	for (int i = 0; i < items.size() && !mMouseDown; ++i) {
+		//		if (anyMouseDown(anyMouseDown, items[i])) mMouseDown = true;
+		//	}
+
+		//	// 3) Only drag the panel when the header itself is pressed (so other presses don't move it)
+		//	if (mGuiHeader != nullptr && mGuiHeader->getDraggable() && mGuiHeader->getMouseDown()) {
+		//		mMoving = true;
+		//		ofPoint mouse(ofGetMouseX(), ofGetMouseY());
+		//		moveGui(mouse - mGuiHeader->getDragOffset());
+		//	}
+		//
+
+		//}
+
+  //  }
 // empty the trash //
     for (int i=0; i<trash.size(); i++) delete trash[i];
     trash.clear();
