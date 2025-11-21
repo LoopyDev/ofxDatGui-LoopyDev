@@ -33,6 +33,10 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 {
     
     public:
+		enum class Orientation {
+			VERTICAL,
+			HORIZONTAL
+		};
     
         ofxDatGui(int x, int y);
         ofxDatGui(ofxDatGuiAnchor anchor = ofxDatGuiAnchor::TOP_LEFT);
@@ -54,6 +58,10 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void setTheme(ofxDatGuiTheme* t, bool applyImmediately = false);
         void setAutoDraw(bool autodraw, int priority = 0);
         void setLabelAlignment(ofxDatGuiAlignment align);
+
+		void setOrientation(Orientation orientation);
+		Orientation getOrientation() const { return mOrientation; }
+
         static void setAssetPath(string path);
         static string getAssetPath();
     
@@ -149,7 +157,9 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool mThemeChanged;
         bool mAlignmentChanged;
         ofColor mGuiBackground;
-    
+
+		Orientation mOrientation;
+
         ofPoint mPosition;
         ofRectangle mGuiBounds;
         ofxDatGuiAnchor mAnchor;
