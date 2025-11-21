@@ -23,6 +23,8 @@
 #pragma once
 #include "ofxDatGuiIntObject.h"
 
+class ofxDatGui;
+
 class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
 {
     public:
@@ -101,6 +103,10 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         virtual bool getIsExpanded();
         virtual void drawColorPicker();
 
+        // Root association (non-owning).
+        virtual void setRoot(ofxDatGui* r) { mRoot = r; }
+        ofxDatGui* getRoot() const { return mRoot; }
+
         virtual void onFocus();    
         virtual void onFocusLost();
         virtual void onWindowResized();
@@ -126,6 +132,7 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         bool mEnabled;
         bool mMouseOver;
         bool mMouseDown;
+        ofxDatGui* mRoot = nullptr;
 
 		// LoopyDev - Global Click Capture
 		static void clearGlobalPressOwner();
