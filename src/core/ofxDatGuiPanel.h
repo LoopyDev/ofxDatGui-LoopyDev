@@ -176,7 +176,9 @@ public:
 		if (!item) return nullptr;
 
 		item->setIndex(static_cast<int>(children.size()));
-		item->setRoot(getRoot());
+		// Store root in local variable to avoid incomplete type issues
+		ofxDatGui* root = getRoot();
+		item->setRoot(root);
 
 		// Make new kids follow the panel's current stripe orientation
 		if (mOrientation == Orientation::HORIZONTAL) {
