@@ -23,6 +23,7 @@
 #include "ofxDatGuiRadioGroup.h"
 #include "ofxDatGuiCurveEditor.h"
 #include "ofxDatGuiPanel.h"
+#include "ofxDatGuiContainer.h"
 
 //enum class ofxDatGuiDropdownBehavior {
 //	SelectCloses, // legacy behavior: select and collapse
@@ -178,13 +179,17 @@ protected:
 // -----------------------------------------------------------------------------
 // Folder
 // -----------------------------------------------------------------------------
-class ofxDatGuiFolder : public ofxDatGuiGroup {
+// Phase 1: Folder is now a Container (not a Button), with a clickable header
+// for expand/collapse. This separates "container" from "leaf widget" concepts.
+class ofxDatGuiFolder : public ofxDatGuiContainer {
 
 public:
 	ofxDatGuiFolder(string label, ofColor color = ofColor::white)
-		: ofxDatGuiGroup(label)
+		: ofxDatGuiContainer(label)
+		, mIsExpanded(false)
 		, fHeaderPressed(false)
-		, fToggledThisPress(false) {
+		, fToggledThisPress(false)
+		, mHeaderHeight(0) {
 		mStyle.stripe.color = color;
 		mType = ofxDatGuiType::FOLDER;
 		setTheme(ofxDatGuiComponent::getTheme());
@@ -194,21 +199,83 @@ public:
 		setComponentStyle(theme);
 		mIconOpen = theme->icon.groupOpen;
 		mIconClosed = theme->icon.groupClosed;
+		mHeaderHeight = mStyle.height; // Header uses component height
 		setWidth(theme->layout.width, theme->layout.labelWidth);
-		for (auto i : children)
-			i->setStripeColor(mStyle.stripe.color);
+		// Phase 1: Update children via container's children vector
+		for (auto & child : children) {
+			child->setStripeColor(mStyle.stripe.color);
+		}
+		// Initialize icon position (mIcon is from base component)
+		mIcon.x = mStyle.width - (mStyle.width * 0.05f) - mIcon.size;
+		mIcon.y = mStyle.height * 0.33f;
 	}
 
 	void setWidth(int width, float labelWidth = 1) override {
 		ofxDatGuiComponent::setWidth(width, labelWidth);
+		// Phase 1: Setup label positioning for header
 		mLabel.width = mStyle.width;
 		mLabel.rightAlignedXpos = mIcon.x - mLabel.margin;
 		ofxDatGuiComponent::positionLabel();
+		layoutChildren(); // Relayout when width changes
+	}
+	
+	// Phase 1: Expand/collapse functionality (no longer from Group/Button)
+	void expand() {
+		mIsExpanded = true;
+		layoutChildren();
+		onFolderToggled();
+	}
+	
+	void collapse() {
+		ofxDatGuiComponent::clearGlobalPressOwner();
+		mIsExpanded = false;
+		layoutChildren();
+		onFolderToggled();
+	}
+	
+	void toggle() {
+		mIsExpanded ? collapse() : expand();
+	}
+	
+	bool getIsExpanded() override { return mIsExpanded; }
+	
+	int getHeight() override {
+		if (!mIsExpanded) return mHeaderHeight;
+		return mHeaderHeight + mContentHeight;
 	}
 
 	void drawColorPicker() override {
-		for (int i = 0; i < (int)pickers.size(); i++)
-			pickers[i]->drawColorPicker();
+		for (auto & picker : pickers)
+			picker->drawColorPicker();
+	}
+	
+	// Phase 1: Override draw to draw header + children
+	void draw() override {
+		if (!mVisible) return;
+		
+		ofPushStyle();
+		
+		// Draw header (clickable region, not a button widget)
+		drawHeader();
+		
+		// Draw children if expanded
+		if (mIsExpanded) {
+			ofxDatGuiContainer::draw(); // Draw children via container
+		}
+		
+		// Draw color pickers
+		drawColorPicker();
+		
+		ofPopStyle();
+	}
+	
+	// Phase 1: Override update to handle header clicks
+	void update(bool parentEnabled = true) override {
+		// Update container (handles children)
+		ofxDatGuiContainer::update(parentEnabled);
+		
+		// Handle header click detection
+		// (Mouse handling is done in onMousePress/Release)
 	}
 
 	// Event dispatchers
@@ -476,35 +543,32 @@ public:
 	}
 
 
+	// Phase 1: Convert attachItem to use container's unique_ptr management
 	void attachItem(ofxDatGuiComponent * item) {
-		item->setIndex((int)children.size());
+		if (!item) return;
+		
+		item->setStripeColor(mStyle.stripe.color);
 		item->onInternalEvent(this, &ofxDatGuiFolder::dispatchInternalEvent);
-		children.push_back(item);
+		
+		// Use container's emplaceChild for ownership
+		emplaceChild(ComponentPtr(item));
 	}
 
 	ofxDatGuiComponent * getComponent(ofxDatGuiType type, string label) {
-		for (int i = 0; i < (int)children.size(); i++) {
-			if (children[i]->getType() == type && children[i]->is(label)) return children[i];
+		// Phase 1: Use container's children (unique_ptr)
+		for (auto & child : children) {
+			if (child->getType() == type && child->is(label)) return child.get();
 		}
-		return NULL;
+		return nullptr;
 	}
 
 	static ofxDatGuiFolder * getInstance() { return new ofxDatGuiFolder("X"); }
 
-private:
-	DropdownCB dropdownEventCallback;
-
-	RadioGroupCB radioGroupEventCallback;
-	std::vector<std::shared_ptr<ofxDatGuiColorPicker>> pickers;
-
-	bool fHeaderPressed = false;
-	bool fToggledThisPress = false;
-
+protected:
 	inline bool pointInHeader(const ofPoint & m) const {
 		return (m.x > x && m.x < x + mStyle.width && m.y > y && m.y < y + mStyle.height);
 	}
 
-protected:
 	void onMousePress(ofPoint m) override {
 		fHeaderPressed = pointInHeader(m);
 		fToggledThisPress = false;
@@ -523,11 +587,109 @@ protected:
 		if (fHeaderPressed && releaseOnHeader && !fToggledThisPress) {
 			fToggledThisPress = true;
 			ofxDatGuiComponent::onMouseRelease(m);
-			mIsExpanded ? collapse() : expand();
+			toggle(); // Use new toggle method
 		} else {
 			ofxDatGuiComponent::onMouseRelease(m);
 		}
 		ofxDatGuiComponent::onFocusLost();
 		fHeaderPressed = false;
 	}
+	
+	// Phase 1: Implement layoutChildren from container
+	void layoutChildren() override {
+		if (!mIsExpanded) {
+			mContentHeight = 0;
+			return;
+		}
+		
+		int cursorY = y + mHeaderHeight + mStyle.vMargin;
+		mContentHeight = mStyle.vMargin; // Start with top margin
+		
+		for (auto & child : children) {
+			if (!child->getVisible()) continue;
+			
+			child->setPosition(x, cursorY);
+			cursorY += child->getHeight() + mStyle.vMargin;
+			mContentHeight += child->getHeight() + mStyle.vMargin;
+		}
+		
+		// Remove trailing margin
+		if (mContentHeight > mStyle.vMargin) {
+			mContentHeight -= mStyle.vMargin;
+		}
+	}
+	
+	// Phase 1: Internal event handler
+	void dispatchInternalEvent(ofxDatGuiInternalEvent e) {
+		if (e.type == ofxDatGuiEventType::VISIBILITY_CHANGED) {
+			layoutChildren();
+		}
+		if (internalEventCallback != nullptr) {
+			internalEventCallback(e);
+		}
+	}
+	
+	void onFolderToggled() {
+		if (internalEventCallback != nullptr) {
+			ofxDatGuiInternalEvent e(ofxDatGuiEventType::GROUP_TOGGLED, mIndex);
+			internalEventCallback(e);
+		}
+	}
+	
+	// Phase 1: Draw the header (replaces button drawing)
+	void drawHeader() {
+		// Draw header background (use button-like background color)
+		ofColor bgColor = mMouseOver ? mStyle.color.onMouseOver : mStyle.color.background;
+		if (mMouseDown) bgColor = mStyle.color.onMouseDown;
+		ofSetColor(bgColor, mStyle.opacity);
+		ofDrawRectangle(x, y, mStyle.width, mHeaderHeight);
+		
+		// Draw stripe (mStyle.stripe is from base component)
+		if (mStyle.stripe.visible && mStyle.stripe.width > 0) {
+			ofSetColor(mStyle.stripe.color);
+			// Use stripe position from component
+			if (mStyle.stripe.position == ofxDatGuiComponent::StripePosition::LEFT) {
+				ofDrawRectangle(x, y, mStyle.stripe.width, mHeaderHeight);
+			}
+		}
+		
+		// Draw label (mLabel and mFont are from base component)
+		ofSetColor(mLabel.color);
+		if (mFont) {
+			// Use the rendered label text and proper positioning
+			mFont->draw(mLabel.rendered, x + mLabel.x, y + mHeaderHeight/2 + mLabel.rect.height/2);
+		}
+		
+		// Draw expand/collapse icon (mIcon is from base component)
+		ofSetColor(mIcon.color);
+		if (mIsExpanded && mIconOpen) {
+			mIconOpen->draw(x + mIcon.x, y + mIcon.y, mIcon.size, mIcon.size);
+		} else if (!mIsExpanded && mIconClosed) {
+			mIconClosed->draw(x + mIcon.x, y + mIcon.y, mIcon.size, mIcon.size);
+		}
+	}
+
+private:
+	DropdownCB dropdownEventCallback;
+	RadioGroupCB radioGroupEventCallback;
+	std::vector<std::shared_ptr<ofxDatGuiColorPicker>> pickers;
+	
+	// Phase 1: Header state (no longer from Group/Button)
+	bool mIsExpanded;
+	bool fHeaderPressed;
+	bool fToggledThisPress;
+	int mHeaderHeight;
+	int mContentHeight = 0;
+	
+	// Icons for expand/collapse
+	shared_ptr<ofImage> mIconOpen;
+	shared_ptr<ofImage> mIconClosed;
+	
+	// Note: mIcon and mLabel are inherited from ofxDatGuiComponent
+	// We just store the icon images here
 };
+
+// Phase 1: Inline definition of Folder::addDropdown (moved from ofxDatGuiDropdown.h
+// to avoid forward declaration issues)
+ofxDatGuiDropdown * addDropdown(std::string label,
+	const std::vector<std::string> & options);

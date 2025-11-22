@@ -1,6 +1,6 @@
 #pragma once
 /*
-    ofxDatGuiDropdown.h — no radio mode
+    ofxDatGuiDropdown.h ï¿½ no radio mode
     Minimal, production-ready dropdown that always: click -> select -> collapse.
 */
 
@@ -121,11 +121,5 @@ private:
 };
 
 // --- Folder helper to add dropdowns (definition) ---
-inline ofxDatGuiDropdown * ofxDatGuiFolder::addDropdown(std::string label,
-	const std::vector<std::string> & options) {
-	auto * dd = new ofxDatGuiDropdown(std::move(label), options);
-	dd->setStripeColor(mStyle.stripe.color);
-	dd->onDropdownEvent(this, &ofxDatGuiFolder::dispatchDropdownEvent);
-	attachItem(dd);
-	return dd;
-}
+// Phase 1: Moved to ofxDatGuiGroups.h after Folder class definition
+// to avoid forward declaration issues

@@ -37,22 +37,22 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 **Goal:** unify all �things that own children� behind a single base class.
 
-- [ ] Add `ofxDatGuiContainer`:
-  - [ ] `src/core/ofxDatGuiContainer.h` (and `.cpp`):
-    - [ ] `class ofxDatGuiContainer : public ofxDatGuiComponent`
-    - [ ] `std::vector<std::unique_ptr<ofxDatGuiComponent>> children;`
-    - [ ] `template<typename T, typename... Args> T* addChild(Args&&... args);`
-    - [ ] `void update(bool parentEnabled) override;`
-    - [ ] `void draw() override;`
-    - [ ] `virtual void layoutChildren() = 0;`
-    - [ ] `virtual void onChildrenChanged() { layoutChildren(); }`
-- [ ] Make **containers inherit from it**:
-  - [ ] `ofxDatGuiPanel : public ofxDatGuiContainer`
-  - [ ] `ofxDatGuiFolder : public ofxDatGuiContainer`
-- [ ] Refactor **existing child management**:
-  - [ ] Replace ad-hoc `attachItem(...)`-style child vectors in `Panel` with `addChild<>()` + `children`.
-  - [ ] Same for `Folder` (or at least route it through `ofxDatGuiContainer` internally).
-  - [ ] Move generic �update children / draw children� logic into `ofxDatGuiContainer`.
+- [x] Add `ofxDatGuiContainer`:
+  - [x] `src/core/ofxDatGuiContainer.h` (and `.cpp`):
+    - [x] `class ofxDatGuiContainer : public ofxDatGuiComponent`
+    - [x] `std::vector<std::unique_ptr<ofxDatGuiComponent>> children;`
+    - [x] `template<typename T, typename... Args> T* addChild(Args&&... args);`
+    - [x] `void update(bool parentEnabled) override;`
+    - [x] `void draw() override;`
+    - [x] `virtual void layoutChildren() = 0;`
+    - [x] `virtual void onChildrenChanged() { layoutChildren(); }`
+- [x] Make **containers inherit from it**:
+  - [x] `ofxDatGuiPanel : public ofxDatGuiContainer`
+  - [x] `ofxDatGuiFolder : public ofxDatGuiContainer`
+- [x] Refactor **existing child management**:
+  - [x] Replace ad-hoc `attachItem(...)`-style child vectors in `Panel` with `addChild<>()` + `children`.
+  - [x] Same for `Folder` (or at least route it through `ofxDatGuiContainer` internally).
+  - [x] Move generic �update children / draw children� logic into `ofxDatGuiContainer`.
 - [ ] Keep `ofxDatGui`�s `items` vector unchanged for now (raw pointers are fine here temporarily).
 
 ---
