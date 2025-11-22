@@ -41,7 +41,6 @@ ofxDatGui::ofxDatGui(ofxDatGuiAnchor anchor)
 
 ofxDatGui::~ofxDatGui()
 {
-    for (auto i:items) delete i;
     mGuis.erase(std::remove(mGuis.begin(), mGuis.end(), this), mGuis.end());
     if (mActiveGui == this) mActiveGui = mGuis.size() > 0 ? mGuis[0] : nullptr;
     ofRemoveListener(ofEvents().draw, this, &ofxDatGui::onDraw, OF_EVENT_ORDER_AFTER_APP + mIndex);
@@ -164,7 +163,7 @@ void ofxDatGui::setOrientation(Orientation orientation) {
 void ofxDatGui::setTheme(ofxDatGuiTheme* t, bool applyImmediately)
 {
     if (applyImmediately){
-        for(auto item:items) item->setTheme(t);
+        for(auto & item : items) item->setTheme(t);
     }   else{
     // apply on next update call //
         mTheme = t;
@@ -224,6 +223,16 @@ bool ofxDatGui::getMouseDown()
     return mMouseDown;
 }
 
+void ofxDatGui::setMouseCapture(ofxDatGuiComponent* c)
+{
+	mMouseCaptureOwner = c;
+}
+
+ofxDatGuiComponent* ofxDatGui::getMouseCapture() const
+{
+	return mMouseCaptureOwner;
+}
+
 void ofxDatGui::setLabelAlignment(ofxDatGuiAlignment align)
 {
     mAlignment = align;
@@ -262,13 +271,16 @@ string ofxDatGui::getAssetPath()
 ofxDatGuiHeader* ofxDatGui::addHeader(string label, bool draggable)
 {
     if (mGuiHeader == nullptr){
-        mGuiHeader = new ofxDatGuiHeader(label, draggable);
+        auto header = std::make_unique<ofxDatGuiHeader>(label, draggable);
+        mGuiHeader = header.get();
         if (items.size() == 0){
-            items.push_back(mGuiHeader);
+            items.push_back(std::move(header));
         }   else{
     // always ensure header is at the top of the panel //
-            items.insert(items.begin(), mGuiHeader);
+            items.insert(items.begin(), std::move(header));
         }
+        mGuiHeader->setRoot(this);
+        mGuiHeader->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
         layoutGui();
 	}
     return mGuiHeader;
@@ -277,8 +289,10 @@ ofxDatGuiHeader* ofxDatGui::addHeader(string label, bool draggable)
 ofxDatGuiFooter* ofxDatGui::addFooter()
 {
     if (mGuiFooter == nullptr){
-        mGuiFooter = new ofxDatGuiFooter();
-        items.push_back(mGuiFooter);
+        auto footer = std::make_unique<ofxDatGuiFooter>();
+        mGuiFooter = footer.get();
+        items.push_back(std::move(footer));
+        mGuiFooter->setRoot(this);
         mGuiFooter->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
         layoutGui();
 	}
@@ -287,41 +301,46 @@ ofxDatGuiFooter* ofxDatGui::addFooter()
 
 ofxDatGuiLabel* ofxDatGui::addLabel(string label)
 {
-    ofxDatGuiLabel* lbl = new ofxDatGuiLabel(label);
-    attachItem(lbl);
-    return lbl;
+    auto item = std::make_unique<ofxDatGuiLabel>(label);
+    auto* raw = item.get();
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiButton* ofxDatGui::addButton(string label)
 {
-    ofxDatGuiButton* button = new ofxDatGuiButton(label);
-    button->onButtonEvent(this, &ofxDatGui::onButtonEventCallback);
-    attachItem(button);
-    return button;
+    auto item = std::make_unique<ofxDatGuiButton>(label);
+    auto* raw = item.get();
+    raw->onButtonEvent(this, &ofxDatGui::onButtonEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiToggle* ofxDatGui::addToggle(string label, bool enabled)
 {
-    ofxDatGuiToggle* button = new ofxDatGuiToggle(label, enabled);
-    button->onToggleEvent(this, &ofxDatGui::onToggleEventCallback);
-    attachItem(button);
-    return button;
+    auto item = std::make_unique<ofxDatGuiToggle>(label, enabled);
+    auto* raw = item.get();
+    raw->onToggleEvent(this, &ofxDatGui::onToggleEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiSlider* ofxDatGui::addSlider(ofParameter<int>& p)
 {
-    ofxDatGuiSlider* slider = new ofxDatGuiSlider(p);
-    slider->onSliderEvent(this, &ofxDatGui::onSliderEventCallback);
-    attachItem(slider);
-    return slider;
+    auto item = std::make_unique<ofxDatGuiSlider>(p);
+    auto* raw = item.get();
+    raw->onSliderEvent(this, &ofxDatGui::onSliderEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiSlider* ofxDatGui::addSlider(ofParameter<float>& p)
 {
-    ofxDatGuiSlider* slider = new ofxDatGuiSlider(p);
-    slider->onSliderEvent(this, &ofxDatGui::onSliderEventCallback);
-    attachItem(slider);
-    return slider;
+    auto item = std::make_unique<ofxDatGuiSlider>(p);
+    auto* raw = item.get();
+    raw->onSliderEvent(this, &ofxDatGui::onSliderEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiSlider* ofxDatGui::addSlider(string label, float min, float max)
@@ -333,97 +352,110 @@ ofxDatGuiSlider* ofxDatGui::addSlider(string label, float min, float max)
 
 ofxDatGuiSlider* ofxDatGui::addSlider(string label, float min, float max, float val)
 {
-    ofxDatGuiSlider* slider = new ofxDatGuiSlider(label, min, max, val);
-    slider->onSliderEvent(this, &ofxDatGui::onSliderEventCallback);
-    attachItem(slider);
-    return slider;
+    auto item = std::make_unique<ofxDatGuiSlider>(label, min, max, val);
+    auto* raw = item.get();
+    raw->onSliderEvent(this, &ofxDatGui::onSliderEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiTextInput* ofxDatGui::addTextInput(string label, string value)
 {
-    ofxDatGuiTextInput* input = new ofxDatGuiTextInput(label, value);
-    input->onTextInputEvent(this, &ofxDatGui::onTextInputEventCallback);
-    attachItem(input);
-    return input;
+    auto item = std::make_unique<ofxDatGuiTextInput>(label, value);
+    auto* raw = item.get();
+    raw->onTextInputEvent(this, &ofxDatGui::onTextInputEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiColorPicker* ofxDatGui::addColorPicker(string label, ofColor color)
 {
-    ofxDatGuiColorPicker* picker = new ofxDatGuiColorPicker(label, color);
-    picker->onColorPickerEvent(this, &ofxDatGui::onColorPickerEventCallback);
-    attachItem(picker);
-    return picker;
+    auto item = std::make_unique<ofxDatGuiColorPicker>(label, color);
+    auto* raw = item.get();
+    raw->onColorPickerEvent(this, &ofxDatGui::onColorPickerEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiWaveMonitor* ofxDatGui::addWaveMonitor(string label, float frequency, float amplitude)
 {
-    ofxDatGuiWaveMonitor* monitor = new ofxDatGuiWaveMonitor(label, frequency, amplitude);
-    attachItem(monitor);
-    return monitor;
+    auto item = std::make_unique<ofxDatGuiWaveMonitor>(label, frequency, amplitude);
+    auto* raw = item.get();
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiValuePlotter* ofxDatGui::addValuePlotter(string label, float min, float max)
 {
-    ofxDatGuiValuePlotter* plotter = new ofxDatGuiValuePlotter(label, min, max);
-    attachItem(plotter);
-    return plotter;
+    auto item = std::make_unique<ofxDatGuiValuePlotter>(label, min, max);
+    auto* raw = item.get();
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiDropdown* ofxDatGui::addDropdown(string label, vector<string> options)
 {
-    ofxDatGuiDropdown* dropdown = new ofxDatGuiDropdown(label, options);
-    dropdown->onDropdownEvent(this, &ofxDatGui::onDropdownEventCallback);
-    attachItem(dropdown);
-    return dropdown;
+    auto item = std::make_unique<ofxDatGuiDropdown>(label, options);
+    auto* raw = item.get();
+    raw->onDropdownEvent(this, &ofxDatGui::onDropdownEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 ofxDatGuiRadioGroup * ofxDatGui::addRadioGroup(const std::string & label, const std::vector<std::string> & options) {
-	ofxDatGuiRadioGroup * rg = new ofxDatGuiRadioGroup(label, options);
-	rg->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
-	attachItem(rg);
-	return rg;
+	auto item = std::make_unique<ofxDatGuiRadioGroup>(label, options);
+	auto* raw = item.get();
+	raw->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
+	attachItem(std::move(item));
+	return raw;
 }
 
 ofxDatGuiFRM* ofxDatGui::addFRM(float refresh)
 {
-    ofxDatGuiFRM* monitor = new ofxDatGuiFRM(refresh);
-    attachItem(monitor);
-    return monitor;
+    auto item = std::make_unique<ofxDatGuiFRM>(refresh);
+    auto* raw = item.get();
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiBreak* ofxDatGui::addBreak()
 {
-    ofxDatGuiBreak* brk = new ofxDatGuiBreak();
-    attachItem(brk);
-    return brk;
+    auto item = std::make_unique<ofxDatGuiBreak>();
+    auto* raw = item.get();
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGui2dPad* ofxDatGui::add2dPad(string label)
 {
-    ofxDatGui2dPad* pad = new ofxDatGui2dPad(label);
-    pad->on2dPadEvent(this, &ofxDatGui::on2dPadEventCallback);
-    attachItem(pad);
-    return pad;
+    auto item = std::make_unique<ofxDatGui2dPad>(label);
+    auto* raw = item.get();
+    raw->on2dPadEvent(this, &ofxDatGui::on2dPadEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGui2dPad* ofxDatGui::add2dPad(string label, ofRectangle bounds)
 {
-    ofxDatGui2dPad* pad = new ofxDatGui2dPad(label, bounds);
-    pad->on2dPadEvent(this, &ofxDatGui::on2dPadEventCallback);
-    attachItem(pad);
-    return pad;
+    auto item = std::make_unique<ofxDatGui2dPad>(label, bounds);
+    auto* raw = item.get();
+    raw->on2dPadEvent(this, &ofxDatGui::on2dPadEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiMatrix* ofxDatGui::addMatrix(string label, int numButtons, bool showLabels)
 {
-    ofxDatGuiMatrix* matrix = new ofxDatGuiMatrix(label, numButtons, showLabels);
-    matrix->onMatrixEvent(this, &ofxDatGui::onMatrixEventCallback);
-    attachItem(matrix);
-    return matrix;
+    auto item = std::make_unique<ofxDatGuiMatrix>(label, numButtons, showLabels);
+    auto* raw = item.get();
+    raw->onMatrixEvent(this, &ofxDatGui::onMatrixEventCallback);
+    attachItem(std::move(item));
+    return raw;
 }
 
 ofxDatGuiFolder* ofxDatGui::addFolder(string label, ofColor color)
 {
-    ofxDatGuiFolder* folder = new ofxDatGuiFolder(label, color);
+    auto item = std::make_unique<ofxDatGuiFolder>(label, color);
+    auto* folder = item.get();
     folder->onButtonEvent(this, &ofxDatGui::onButtonEventCallback);
     folder->onToggleEvent(this, &ofxDatGui::onToggleEventCallback);
     folder->onSliderEvent(this, &ofxDatGui::onSliderEventCallback);
@@ -436,44 +468,51 @@ ofxDatGuiFolder* ofxDatGui::addFolder(string label, ofColor color)
 	folder->onRadioGroupEvent(this, &ofxDatGui::onRadioGroupEventCallback);
 	folder->onDropdownEvent(this, &ofxDatGui::onDropdownEventCallback);
 
-    attachItem(folder);
+    attachItem(std::move(item));
     return folder;
 }
 
 ofxDatGuiFolder* ofxDatGui::addFolder(ofxDatGuiFolder* folder)
 {
-    attachItem(folder);
-    return folder;
+    if (!folder) return nullptr;
+    ComponentPtr ptr(folder);
+    auto* raw = folder;
+    attachItem(std::move(ptr));
+    return raw;
 }
 
 // ofxDatGui.cpp
 
 ofxDatGuiPanel * ofxDatGui::addPanel(ofxDatGuiPanel::Orientation orientation) {
-	auto * panel = new ofxDatGuiPanel(orientation);
+	auto panel = std::make_unique<ofxDatGuiPanel>(orientation);
+	auto * raw = panel.get();
 
-	// Use the global default theme – it's always valid.
-	panel->setTheme(ofxDatGuiComponent::getTheme());
+	// Use the global default theme - it's always valid.
+	raw->setTheme(ofxDatGuiComponent::getTheme());
 
-	// Match the gui’s current width so the panel knows its row size.
-	panel->setWidth(mWidth, mLabelWidth);
+	// Match the gui's current width so the panel knows its row size.
+	raw->setWidth(mWidth, mLabelWidth);
 
 	// Let the gui do the usual wiring (index, internal events, layout, etc).
-	attachItem(panel);
+	attachItem(std::move(panel));
 
-	return panel;
+	return raw;
 }
 
 
 
-void ofxDatGui::attachItem(ofxDatGuiComponent* item)
+void ofxDatGui::attachItem(ComponentPtr item)
 {
+    if (!item) return;
+
+    auto * raw = item.get();
     if (mGuiFooter != nullptr){
-        items.insert(items.end()-1, item);
+        items.insert(items.end()-1, std::move(item));
     }   else {
-        items.push_back( item );
+        items.push_back(std::move(item));
     }
-    item->setRoot(this);
-    item->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
+    raw->setRoot(this);
+    raw->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
     layoutGui();
 }
 
@@ -721,16 +760,21 @@ ofxDatGuiFooter* ofxDatGui::getFooter()
 
 ofxDatGuiComponent* ofxDatGui::getComponent(ofxDatGuiType type, string label)
 {
-    for (int i=0; i<items.size(); i++) {
-        if (items[i]->getType() == type){
-            if (items[i]->is(label)) return items[i];
-        }
-    // iterate over component's children and return the first match we find //
-        for (int j=0; j<items[i]->children.size(); j++) {
-            if (items[i]->children[j]->is(label)) return items[i]->children[j];
-        }
-    }
-    return NULL;
+	std::function<ofxDatGuiComponent*(ofxDatGuiComponent*)> findMatch =
+		[&](ofxDatGuiComponent* node) -> ofxDatGuiComponent* {
+			if (!node) return nullptr;
+			if (node->getType() == type && node->is(label)) return node;
+			ofxDatGuiComponent* found = nullptr;
+			node->forEachChild([&](ofxDatGuiComponent* c) {
+				if (!found) found = findMatch(c);
+			});
+			return found;
+		};
+
+	for (auto & item : items) {
+		if (auto* hit = findMatch(item.get())) return hit;
+	}
+	return nullptr;
 }
 
 /*
@@ -864,9 +908,9 @@ void ofxDatGui::layoutGui() {
 	// Collect visible items
 	std::vector<ofxDatGuiComponent *> visible;
 	visible.reserve(items.size());
-	for (auto * item : items) {
+	for (auto & item : items) {
 		if (item->getVisible()) {
-			visible.push_back(item);
+			visible.push_back(item.get());
 		}
 	}
 
@@ -951,8 +995,8 @@ void ofxDatGui::positionGui() {
 		// HORIZONTAL
 		std::vector<ofxDatGuiComponent *> visible;
 		visible.reserve(items.size());
-		for (auto * item : items) {
-			if (item->getVisible()) visible.push_back(item);
+		for (auto & item : items) {
+			if (item->getVisible()) visible.push_back(item.get());
 		}
 
 		int x = mPosition.x;
@@ -997,18 +1041,6 @@ void ofxDatGui::update()
     mThemeChanged = false;
     mAlignmentChanged = false;
     
-    // check for gui focus change //
-    if (ofGetMousePressed() && mActiveGui->mMoving == false){
-        ofPoint mouse = ofPoint(ofGetMouseX(), ofGetMouseY());
-        for (int i=mGuis.size()-1; i>-1; i--){
-        // ignore guis that are invisible //
-            if (mGuis[i]->getVisible() && mGuis[i]->hitTest(mouse)){
-                if (mGuis[i] != mActiveGui) mGuis[i]->focus();
-                break;
-            }
-        }
-    }
-
 	if (!mEnabled) {
 		// disabled: no interaction
 		for (int i = 0; i < items.size(); i++)
@@ -1021,22 +1053,26 @@ void ofxDatGui::update()
 			mGuiFooter->update();
 			mMouseDown = mGuiFooter->getMouseDown();
 		} else {
-			// 1) Update every item; sPressOwner in the component layer
-			//    already guarantees only the owner reacts.
+			// 1) Update every item; component layer uses root-managed capture
+			//    so only the owning component reacts.
 			for (int i = 0; i < items.size(); ++i) {
 				items[i]->update(true);
 			}
 
 			// 2) Panel-level mMouseDown = any descendant is down
-			auto anyMouseDown = [&](auto && self, ofxDatGuiComponent * node) -> bool {
+			// Helper: recursively check descendants for mouse down, against raw child pointers (legacy).
+			std::function<bool(ofxDatGuiComponent *)> anyMouseDown = [&](ofxDatGuiComponent * node) -> bool {
+				if (!node) return false;
 				if (node->getMouseDown()) return true;
-				for (auto * c : node->children)
-					if (self(self, c)) return true;
-				return false;
+				bool hit = false;
+				node->forEachChild([&](ofxDatGuiComponent* c) {
+					if (!hit && anyMouseDown(c)) hit = true;
+				});
+				return hit;
 			};
 			mMouseDown = false;
 			for (int i = 0; i < items.size() && !mMouseDown; ++i) {
-				if (anyMouseDown(anyMouseDown, items[i])) mMouseDown = true;
+				if (anyMouseDown(items[i].get())) mMouseDown = true;
 			}
 
 			// 3) Only drag the panel when the header itself is pressed
@@ -1059,7 +1095,7 @@ void ofxDatGui::update()
   //          mGuiFooter->update();
   //          mMouseDown = mGuiFooter->getMouseDown();
 		//} else {
-		//	// 1) Update every item; sPressOwner in the component layer guarantees only the owner reacts.
+		//	// 1) Update every item; root-managed capture in the component layer guarantees only the owner reacts.
 		//	for (int i = 0; i < items.size(); ++i) {
 		//		items[i]->update(true);
 		//	}
@@ -1128,18 +1164,46 @@ void ofxDatGui::onWindowResized(ofResizeEventArgs &e)
 
 ofxDatGuiButtonBar * ofxDatGui::addButtonBar(const std::string & label,
 	const std::vector<std::string> & buttons) {
-	auto * bar = new ofxDatGuiButtonBar(label, buttons);
+	auto bar = std::make_unique<ofxDatGuiButtonBar>(label, buttons);
+	auto * raw = bar.get();
 
 	// Wire each inner button into the gui's normal button callback,
 	// so they behave like regular top-level buttons.
-	for (auto * child : bar->children) {
+	for (auto * child : raw->children) {
 		if (child->getType() == ofxDatGuiType::BUTTON) {
 			auto * btn = static_cast<ofxDatGuiButton *>(child);
 			btn->onButtonEvent(this, &ofxDatGui::onButtonEventCallback);
 		}
 	}
 
-	attachItem(bar);
-	return bar;
+	attachItem(std::move(bar));
+	return raw;
+}
+
+// -----------------------------------------------------------------------------
+// Out-of-line definitions from ofxDatGuiGroups.h
+// -----------------------------------------------------------------------------
+
+ofxDatGuiDropdown * ofxDatGuiFolder::addDropdown(std::string label,
+	const std::vector<std::string> & options) {
+	auto * dd = new ofxDatGuiDropdown(std::move(label), options);
+	dd->setStripeColor(mStyle.stripe.color);
+	dd->onDropdownEvent(this, &ofxDatGuiFolder::dispatchDropdownEvent);
+	attachItem(dd);
+	return dd;
+}
+
+void ofxDatGuiGroup::collapse() {
+	releaseMouseCapture();
+	mIsExpanded = false;
+	layout();
+	onGroupToggled();
+}
+
+void ofxDatGuiFolder::collapse() {
+	releaseMouseCapture();
+	mIsExpanded = false;
+	layoutChildren();
+	onFolderToggled();
 }
 

@@ -27,16 +27,18 @@
 //#include "ofxDatGuiRadioGroup.h"
 #include "ofxDatGuiButtonBar.h"
 #include "ofxDatGuiPanel.h"
+#include <memory>
 
 
 class ofxDatGui : public ofxDatGuiInteractiveObject
 {
     
     public:
-		enum class Orientation {
-			VERTICAL,
-			HORIZONTAL
-		};
+        using ComponentPtr = std::unique_ptr<ofxDatGuiComponent>;
+        enum class Orientation {
+            VERTICAL,
+            HORIZONTAL
+        };
     
         ofxDatGui(int x, int y);
         ofxDatGui(ofxDatGuiAnchor anchor = ofxDatGuiAnchor::TOP_LEFT);
@@ -71,6 +73,8 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool getVisible();
         bool getAutoDraw();
         bool getMouseDown();
+        void setMouseCapture(ofxDatGuiComponent* c);
+        ofxDatGuiComponent* getMouseCapture() const;
         ofPoint getPosition();
     
         ofxDatGuiHeader* addHeader(string label = "", bool draggable = true);
@@ -99,20 +103,22 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
             float x1 = 0.25f, float y1 = 0.10f,
             float x2 = 0.25f, float y2 = 1.00f,
             float padAspect = 1.0f)
-		{
-			auto * bez = new ofxDatGuiCubicBezier(label, x1, y1, x2, y2, padAspect);
-			// If you later want GUI-level routing, you can add a callback like other components.
-			attachItem(bez);
-			return bez;
-		}
-		// LoopyDev: add Radio Groups
-		ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options);
-		// LoopyDev: add Curve Editor
-		ofxDatGuiCurveEditor * addCurveEditor(string label, float padAspect) {
-			auto * curve = new ofxDatGuiCurveEditor("Response Curve", 0.6f /*padAspect*/);
-			attachItem(curve);
-			return curve;
-		};
+        {
+            auto bez = std::make_unique<ofxDatGuiCubicBezier>(label, x1, y1, x2, y2, padAspect);
+            auto * raw = bez.get();
+            // If you later want GUI-level routing, you can add a callback like other components.
+            attachItem(std::move(bez));
+            return raw;
+        }
+        // LoopyDev: add Radio Groups
+        ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options);
+        // LoopyDev: add Curve Editor
+        ofxDatGuiCurveEditor * addCurveEditor(string label, float padAspect) {
+            auto curve = std::make_unique<ofxDatGuiCurveEditor>("Response Curve", 0.6f /*padAspect*/);
+            auto * raw = curve.get();
+            attachItem(std::move(curve));
+            return raw;
+        };
 		// --- LoopyDev: add horizontal button bar ---
 		ofxDatGuiButtonBar * addButtonBar(const std::string & label,
 			const std::vector<std::string> & buttons);
@@ -152,6 +158,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool mExpanded;
         bool mAutoDraw;
         bool mMouseDown;
+        ofxDatGuiComponent* mMouseCaptureOwner = nullptr;
         bool mAlphaChanged;
         bool mWidthChanged;
         bool mThemeChanged;
@@ -167,7 +174,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         ofxDatGuiFooter* mGuiFooter;
         ofxDatGuiTheme* mTheme;
         ofxDatGuiAlignment mAlignment;
-        vector<ofxDatGuiComponent*> items;
+        std::vector<ComponentPtr> items;
         vector<ofxDatGuiComponent*> trash;
         static ofxDatGui* mActiveGui;
         static vector<ofxDatGui*> mGuis;
@@ -178,7 +185,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
     	void positionGui();
         void moveGui(ofPoint pt);
         bool hitTest(ofPoint pt);
-        void attachItem(ofxDatGuiComponent* item);
+        void attachItem(ComponentPtr item);
     
         void onDraw(ofEventArgs &e);
         void onUpdate(ofEventArgs &e);

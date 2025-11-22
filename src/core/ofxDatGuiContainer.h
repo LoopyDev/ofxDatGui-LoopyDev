@@ -4,11 +4,18 @@
 #include <memory>
 #include <vector>
 
-// Shared container base: owns children via unique_ptr and centralises
-// update/draw traversal. Subclasses only implement layout hooks.
-//
-// Phase 1: Common container base for all components that own children.
-// This unifies child management across Panel, Folder, and future containers.
+/*
+    ofxDatGuiContainer
+    ------------------
+    The shared base for anything that owns child components (e.g. Panel, Folder).
+    - Owns children with std::unique_ptr for clear lifetime/RAII.
+    - Centralises update()/draw() traversal so containers only worry about layout.
+    - Exposes layoutChildren() as the one hook subclasses must implement.
+    - Propagates the GUI root pointer to all descendants via setRoot().
+    - Provides addChild<>() and emplaceChild(...) helpers to standardise insertion.
+    Containers are not leaf widgets; they orchestrate spacing/positioning and
+    delegate the actual rendering/input to the child components themselves.
+*/
 class ofxDatGuiContainer : public ofxDatGuiComponent {
 public:
 	using ComponentPtr = std::unique_ptr<ofxDatGuiComponent>;
@@ -51,6 +58,7 @@ public:
 	// Propagate root pointer downwards when container's root changes.
 	// Phase 1: Ensures all children know their root GUI.
 	void setRoot(ofxDatGui* r) override;
+	void forEachChild(const std::function<void(ofxDatGuiComponent*)> & fn) const override;
 
 protected:
 	// Phase 1: Children owned via unique_ptr for RAII and clear ownership.

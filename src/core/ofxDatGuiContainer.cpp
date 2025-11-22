@@ -46,3 +46,7 @@ void ofxDatGuiContainer::setRoot(ofxDatGui* r) {
 		child->setRoot(r);
 	}
 }
+
+void ofxDatGuiContainer::forEachChild(const std::function<void(ofxDatGuiComponent*)> & fn) const {
+	for (auto & child : children) fn(child.get());
+}

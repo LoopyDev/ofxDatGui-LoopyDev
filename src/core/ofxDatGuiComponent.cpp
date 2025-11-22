@@ -21,9 +21,7 @@
 */
 
 #include "ofxDatGuiComponent.h"
-
-// One global owner for any active mouse press
-static ofxDatGuiComponent * sPressOwner = nullptr;
+#include "ofxDatGui.h"
 
 bool ofxDatGuiLog::mQuiet = false;
 string ofxDatGuiTheme::AssetPath = "";
@@ -51,7 +49,9 @@ ofxDatGuiComponent::~ofxDatGuiComponent()
     ofRemoveListener(ofEvents().windowResized, this, &ofxDatGuiComponent::onWindowResized);
 
 	// Clear mouse press ownership
-	if (sPressOwner == this) sPressOwner = nullptr;
+	if (auto* root = getRoot()) {
+		if (root->getMouseCapture() == this) root->setMouseCapture(nullptr);
+	}
 }
 
 /*
@@ -120,7 +120,7 @@ void ofxDatGuiComponent::setComponentStyle(const ofxDatGuiTheme* theme)
     mLabel.forceUpperCase = theme->layout.upperCaseLabels;
     setLabel(mLabel.text);
     setWidth(theme->layout.width, theme->layout.labelWidth);
-    for (int i=0; i<children.size(); i++) children[i]->setTheme(theme);
+    forEachChild([&](ofxDatGuiComponent* c){ c->setTheme(theme); });
 }
 
 void ofxDatGuiComponent::setWidth(int width, float labelWidth)
@@ -135,7 +135,7 @@ void ofxDatGuiComponent::setWidth(int width, float labelWidth)
     }
     mIcon.x = mStyle.width - (mStyle.width * .05) - mIcon.size;
     mLabel.rightAlignedXpos = mLabel.width - mLabel.margin;
-    for (int i=0; i<children.size(); i++) children[i]->setWidth(width, labelWidth);
+    forEachChild([&](ofxDatGuiComponent* c){ c->setWidth(width, labelWidth); });
     positionLabel();
 }
 
@@ -163,14 +163,22 @@ void ofxDatGuiComponent::setPosition(int x, int y)
 {
     this->x = x;
     this->y = y;
-    for(int i=0; i<children.size(); i++) children[i]->setPosition(x, this->y + (mStyle.height+mStyle.vMargin)*(i+1));
+    int idx = 0;
+    forEachChild([&](ofxDatGuiComponent* c){
+        c->setPosition(x, this->y + (mStyle.height+mStyle.vMargin)*(idx+1));
+        ++idx;
+    });
 }
 
 void ofxDatGuiComponent::setVisible(bool visible)
 {
     mVisible = visible;
 
-	if (!visible && sPressOwner == this) sPressOwner = nullptr;
+	if (!visible) {
+		if (auto* root = getRoot()) {
+			if (root->getMouseCapture() == this) root->setMouseCapture(nullptr);
+		}
+	}
 
     if (internalEventCallback != nullptr){
         ofxDatGuiInternalEvent e(ofxDatGuiEventType::VISIBILITY_CHANGED, mIndex);
@@ -186,7 +194,7 @@ bool ofxDatGuiComponent::getVisible()
 void ofxDatGuiComponent::setOpacity(float opacity)
 {
     mStyle.opacity = opacity * 255;
-    for (int i=0; i<children.size(); i++) children[i]->setOpacity(opacity);
+    forEachChild([&](ofxDatGuiComponent* c){ c->setOpacity(opacity); });
 }
 
 void ofxDatGuiComponent::setEnabled(bool enabled)
@@ -223,10 +231,13 @@ void ofxDatGuiComponent::setMask(const ofRectangle &mask)
     mMask = mask;
 }
 
-// LoopyDev - Clobal Click Capture
-void ofxDatGuiComponent::clearGlobalPressOwner() { sPressOwner = nullptr; }
-bool ofxDatGuiComponent::isAnyPressActive() { return sPressOwner != nullptr; }
+void ofxDatGuiComponent::forEachChild(const std::function<void(ofxDatGuiComponent*)> & fn) const {
+	for (auto * c : children) fn(c);
+}
 
+void ofxDatGuiComponent::releaseMouseCapture() {
+	if (auto* root = getRoot()) root->setMouseCapture(nullptr);
+}
 
 void ofxDatGuiComponent::setAnchor(ofxDatGuiAnchor anchor)
 {
@@ -285,7 +296,7 @@ bool ofxDatGuiComponent::getLabelUpperCase()
 void ofxDatGuiComponent::setLabelAlignment(ofxDatGuiAlignment align)
 {
     mLabel.alignment = align;
-    for (int i=0; i<children.size(); i++) children[i]->setLabelAlignment(align);
+    forEachChild([&](ofxDatGuiComponent* c){ c->setLabelAlignment(align); });
     positionLabel();
 }
 
@@ -399,12 +410,17 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 	// Local to mask (only for vertical clip test)
 	const ofPoint mouseLocal(mouseAbs.x - mMask.x, mouseAbs.y - mMask.y);
 
-	 // Only allow hover/highlight when not pressed, or when THIS component owns the press.
-	const bool hoverAllowed = !(mp && sPressOwner != this);
+	auto* root = getRoot();
+	ofxDatGuiComponent* capture = root ? root->getMouseCapture() : nullptr;
+
+	// Only allow hover/highlight when not pressed, or when THIS component owns the press.
+	const bool hoverAllowed = !(mp && capture != nullptr && capture != this);
 
 	const bool overGeom = hitTest(mouseAbs) && (mMask.height <= 0 || (mouseLocal.y >= 0 && mouseLocal.y <= mMask.height));
 	// If this is an expanded container, don't steal presses that begin in the child area (below header).
-	const bool pressInChildRegion = getIsExpanded() && !children.empty() && (ofGetMouseY() > y + mStyle.height);
+	bool hasChild = false;
+	forEachChild([&](ofxDatGuiComponent*){ hasChild = true; });
+	const bool pressInChildRegion = getIsExpanded() && hasChild && (ofGetMouseY() > y + mStyle.height);
 
 	// Block highlighting on drag-in or while another widget owns the press:
 	const bool over = hoverAllowed && overGeom;
@@ -414,34 +430,40 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 
 	if (acceptEvents && mEnabled && mVisible) {
 		if (mp) {
-			if (sPressOwner == this) {
+			if (capture == this) {
 				// We already own this press > keep dragging
 				onMouseDrag(mouseAbs);
-			} else if (sPressOwner == nullptr && overGeom && justPressed && !pressInChildRegion) {
+			} else if (capture == nullptr && overGeom && justPressed && !pressInChildRegion) {
 				// Start a brand new press only if it BEGAN here, this frame
-				sPressOwner = this;
 				mMouseDown = true;
+				if (root) root->setMouseCapture(this);
 				onMousePress(mouseAbs);
 				if (!mFocused) onFocus();
 			}
 			// else: press started elsewhere > ignore (no capture on drag-in)
 		} else {
-			if (sPressOwner == this) {
+			if (capture == this) {
 				// Mouse went up; we were the owner ? release, even if mMouseDown was toggled elsewhere
 				onMouseRelease(mouseAbs);
 				mMouseDown = false;
-				sPressOwner = nullptr;
+				if (root) root->setMouseCapture(nullptr);
+			} else if (!root && mMouseDown) {
+				// No root to manage capture: release locally when mouse goes up.
+				onMouseRelease(mouseAbs);
+				mMouseDown = false;
+			} else if (mMouseDown) {
+				// Lost capture elsewhere; reset local state
+				mMouseDown = false;
 			}
 		}
 
 	}
 
-	if (this->getIsExpanded()) {
-		for (int i = 0; i < children.size(); ++i) {
-			if (!children[i]->getVisible()) continue;
-			children[i]->update(acceptEvents);
+		if (this->getIsExpanded()) {
+			forEachChild([&](ofxDatGuiComponent* c){
+				if (c->getVisible()) c->update(acceptEvents);
+			});
 		}
-	}
 }
 
 
