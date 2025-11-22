@@ -61,29 +61,22 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 **Goal:** input and mouse capture are managed per root GUI, not via global statics.
 
-- [ ] Add a **root pointer** to `ofxDatGuiComponent`:
-  - [ ] `ofxDatGui* root = nullptr;`
-  - [ ] `void setRoot(ofxDatGui* r);`
-  - [ ] `ofxDatGui* getRoot() const;`
-- [ ] Ensure the root pointer is propagated:
-  - [ ] In `ofxDatGui::addXxx(...)`, after creating a component, call `component->setRoot(this);`
-  - [ ] In `ofxDatGuiContainer::addChild`, propagate the root to children:
-    - [ ] When the containerï¿½s root changes, update all children recursively.
-- [ ] Add **mouse capture owner** to `ofxDatGui`:
-  - [ ] In `ofxDatGui`:
-    - [ ] `ofxDatGuiComponent* mouseCaptureOwner = nullptr;`
-    - [ ] `void setMouseCapture(ofxDatGuiComponent* c);`
-    - [ ] `ofxDatGuiComponent* getMouseCapture() const;`
-- [ ] Remove global `sPressOwner` from `ofxDatGuiComponent`:
-  - [ ] Delete the static variable and its uses.
-  - [ ] Replace logic such as:
-    ```cpp
-    if (mousePressedThisFrame && hit && sPressOwner == nullptr) {
-        sPressOwner = this;
-        onMousePress();
-    }
-    ```
-    with:
+- [x] Add a **root pointer** to `ofxDatGuiComponent`:
+  - [x] `ofxDatGui* root = nullptr;`
+  - [x] `void setRoot(ofxDatGui* r);`
+  - [x] `ofxDatGui* getRoot() const;`
+- [x] Ensure the root pointer is propagated:
+  - [x] In `ofxDatGui::addXxx(...)`, after creating a component, call `component->setRoot(this);`
+  - [x] In `ofxDatGuiContainer::addChild`, propagate the root to children:
+    - [x] When the container’s root changes, update all children recursively.
+- [x] Add **mouse capture owner** to `ofxDatGui`:
+  - [x] In `ofxDatGui`:
+    - [x] `ofxDatGuiComponent* mouseCaptureOwner = nullptr;`
+    - [x] `void setMouseCapture(ofxDatGuiComponent* c);`
+    - [x] `ofxDatGuiComponent* getMouseCapture() const;`
+- [x] Remove global `sPressOwner` from `ofxDatGuiComponent`:
+  - [x] Delete the static variable and its uses.
+  - [x] Replace logic such as:
     ```cpp
     auto* root = getRoot();
     if (mousePressedThisFrame && hit && root && root->getMouseCapture() == nullptr) {
@@ -91,13 +84,13 @@ Use this checklist as you refactor the addon. Tick things off as you go.
         onMousePress();
     }
     ```
-  - [ ] For drag/release:
-    - [ ] Only the component that equals `root->getMouseCapture()` handles drag.
-    - [ ] On mouse release, clear it: `root->setMouseCapture(nullptr);`
-- [ ] **De-fang multi-GUI focus switching**:
-  - [ ] Find the block in `ofxDatGui::update()` that scans `mGuis` on mouse press to change `mActiveGui`.
-  - [ ] Remove or disable it (comment out / guard with a flag).
-  - [ ] Commit to ï¿½one gui per windowï¿½ as the normal usage.
+  - [x] For drag/release:
+    - [x] Only the component that equals `root->getMouseCapture()` handles drag.
+    - [x] On mouse release, clear it: `root->setMouseCapture(nullptr);`
+- [x] **De-fang multi-GUI focus switching**:
+  - [x] Find the block in `ofxDatGui::update()` that scans `mGuis` on mouse press to change `mActiveGui`.
+  - [x] Remove or disable it (comment out / guard with a flag).
+  - [x] Commit to ???one gui per window??? as the normal usage.
 
 ---
 
@@ -107,25 +100,32 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 ### 3.1 Root GUI item ownership
 
-- [ ] Change `ofxDatGui::items` from raw pointers to `std::unique_ptr`:
-  - [ ] `using ComponentPtr = std::unique_ptr<ofxDatGuiComponent>;`
-  - [ ] `std::vector<ComponentPtr> items;`
+- [x] Change `ofxDatGui::items` from raw pointers to `std::unique_ptr`:
+  - [x] `using ComponentPtr = std::unique_ptr<ofxDatGuiComponent>;`
+  - [x] `std::vector<ComponentPtr> items;`
 - [ ] Update all `addXxx(...)` functions:
-  - [ ] Use `std::make_unique<T>(...)` to allocate.
-  - [ ] Store in `items` via `emplace_back(std::move(ptr));`
-  - [ ] Call `setRoot(this)` and theme setup on the raw pointer.
-  - [ ] Return raw non-owning pointer to user code for convenience.
+  - [x] Use `std::make_unique<T>(...)` to allocate.
+  - [x] Store in `items` via `emplace_back(std::move(ptr));`
+  - [x] Call `setRoot(this)` and theme setup on the raw pointer.
+  - [x] Return raw non-owning pointer to user code for convenience.
 - [ ] Update loops:
-  - [ ] Replace `for (int i=0; i<items.size(); ++i) items[i]->update(...);`
+  - [x] Replace `for (int i=0; i<items.size(); ++i) items[i]->update(...);`
     with `for (auto& c : items) c->update(...);`, etc.
-- [ ] Remove manual deletes in `ofxDatGui` destructor (RAII will handle it).
+- [x] Remove manual deletes in `ofxDatGui` destructor (RAII will handle it).
 
 ### 3.2 Container child ownership
 
+- [x] `std::vector<std::unique_ptr<ofxDatGuiComponent>> children;` (in `ofxDatGuiContainer`).
+- [x] `addChild<T>` returns raw pointer, but stores `unique_ptr`.
+- [x] Stop using `ofxDatGuiComponent::children` (raw) for traversal; route recursive logic through container-owned children.
+- [x] Migrate legacy containers like `ofxDatGuiGroup` off raw `children` (and remove manual deletes in its destructor).
+- [x] Ensure mouse-down/theme/width propagation walks RAII children rather than raw vectors.
+
+
 - [ ] In `ofxDatGuiContainer`, confirm:
-  - [ ] `std::vector<std::unique_ptr<ofxDatGuiComponent>> children;`
-  - [ ] `addChild<T>` returns raw pointer, but stores `unique_ptr`.
-- [ ] Ensure children are updated/drawn via RAII (no manual deletes).
+  - [x] `std::vector<std::unique_ptr<ofxDatGuiComponent>> children;`
+  - [x] `addChild<T>` returns raw pointer, but stores `unique_ptr`.
+- [x] Ensure children are updated/drawn via RAII (no manual deletes).
 
 ---
 
@@ -242,5 +242,5 @@ You can drop this into `REFACTOR_ROADMAP.md` or merge into your main `README.md`
 
 - [x] Phase 0 Safety Net & Minimal Example (done 2025-01-XX)
 - [ ] Phase 1 ï¿½ Container base (done 2025-11-21)
-- [ ] Phase 2 ï¿½ Mouse capture per root
+- [x] Phase 2 ? Mouse capture per root
 - [ ] Phase 6 ï¿½ ofParameter integration
