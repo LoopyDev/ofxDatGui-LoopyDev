@@ -6,6 +6,7 @@
 
 #include "ofxDatGuiButton.h"
 #include "ofxDatGuiGroups.h"
+#include <memory>
 
 // -----------------------------------------------------------------------------
 // Dropdown Option (single row inside a dropdown)
@@ -48,10 +49,10 @@ public:
 		mType = ofxDatGuiType::DROPDOWN;
 
 		for (int i = 0; i < static_cast<int>(options.size()); ++i) {
-			auto * opt = new ofxDatGuiDropdownOption(options[i]);
+			auto opt = std::make_unique<ofxDatGuiDropdownOption>(options[i]);
 			opt->setIndex(static_cast<int>(children.size()));
 			opt->onButtonEvent(this, &ofxDatGuiDropdown::onOptionSelected);
-			children.push_back(opt);
+			attachChild(std::move(opt));
 		}
 
 		setTheme(ofxDatGuiComponent::getTheme());

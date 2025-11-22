@@ -24,6 +24,7 @@
 #include "ofxDatGuiCurveEditor.h"
 #include "ofxDatGuiPanel.h"
 #include "ofxDatGuiContainer.h"
+#include <memory>
 
 //enum class ofxDatGuiDropdownBehavior {
 //	SelectCloses, // legacy behavior: select and collapse
@@ -49,11 +50,7 @@ public:
 		layout();
 	}
 
-	~ofxDatGuiGroup() {
-		// delete non-picker children (pickers are managed by shared_ptrs in folders)
-		for (auto i : children)
-			if (i->getType() != ofxDatGuiType::COLOR_PICKER) delete i;
-	}
+	~ofxDatGuiGroup() override = default;
 
 	void setPosition(int x, int y) {
 		ofxDatGuiComponent::setPosition(x, y);
@@ -65,12 +62,7 @@ public:
 		layout();
 		onGroupToggled();
 	}
-	void collapse() {
-		ofxDatGuiComponent::clearGlobalPressOwner();
-		mIsExpanded = false;
-		layout();
-		onGroupToggled();
-	}
+	void collapse();
 	void toggle() {
 		mIsExpanded = !mIsExpanded;
 		layout();
@@ -174,6 +166,24 @@ protected:
 	bool mIsExpanded = false;
 	bool mHeaderPressed = false;
 	bool mToggledThisPress = false;
+	std::vector<std::unique_ptr<ofxDatGuiComponent>> ownedChildren;
+
+	void attachChild(std::unique_ptr<ofxDatGuiComponent> child) {
+		if (!child) return;
+		child->setRoot(getRoot());
+		child->setIndex(static_cast<int>(children.size()));
+		children.push_back(child.get());
+		ownedChildren.push_back(std::move(child));
+	}
+
+	void setRoot(ofxDatGui* r) override {
+		ofxDatGuiButton::setRoot(r);
+		for (auto & c : ownedChildren) c->setRoot(r);
+	}
+
+	void forEachChild(const std::function<void(ofxDatGuiComponent*)> & fn) const override {
+		for (auto & c : ownedChildren) fn(c.get());
+	}
 };
 
 // -----------------------------------------------------------------------------
@@ -226,12 +236,7 @@ public:
 		onFolderToggled();
 	}
 	
-	void collapse() {
-		ofxDatGuiComponent::clearGlobalPressOwner();
-		mIsExpanded = false;
-		layoutChildren();
-		onFolderToggled();
-	}
+	void collapse();
 	
 	void toggle() {
 		mIsExpanded ? collapse() : expand();

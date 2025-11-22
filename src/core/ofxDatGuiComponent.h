@@ -22,6 +22,7 @@
 
 #pragma once
 #include "ofxDatGuiIntObject.h"
+#include <functional>
 
 class ofxDatGui;
 
@@ -102,6 +103,9 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         virtual int  getHeight();
         virtual bool getIsExpanded();
         virtual void drawColorPicker();
+        // Iterate direct children; containers override to walk owned children.
+        virtual void forEachChild(const std::function<void(ofxDatGuiComponent*)> & fn) const;
+        void releaseMouseCapture();
 
         // Root association (non-owning).
         virtual void setRoot(ofxDatGui* r) { mRoot = r; }
@@ -133,10 +137,6 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         bool mMouseOver;
         bool mMouseDown;
         ofxDatGui* mRoot = nullptr;
-
-		// LoopyDev - Global Click Capture
-		static void clearGlobalPressOwner();
-		static bool isAnyPressActive();
 
         ofRectangle mMask;
         ofxDatGuiType mType;
