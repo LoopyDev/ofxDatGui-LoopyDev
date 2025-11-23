@@ -39,6 +39,7 @@ examples/**/[Rr]elease*/
 *.cpp.eep
 *.cpp.elf
 *.cpp.hex
+examples/
 
 #########################
 # IDE
