@@ -13,7 +13,7 @@
     - Exposes layoutChildren() as the one hook subclasses must implement.
     - Propagates the GUI root pointer to all descendants via setRoot().
     - Provides addChild<>() and emplaceChild(...) helpers to standardise insertion.
-    Containers are not leaf widgets; they orchestrate spacing/positioning and
+    Containers are not leaf widgets; they orchestrate spascing/positioning and
     delegate the actual rendering/input to the child components themselves.
 */
 class ofxDatGuiContainer : public ofxDatGuiComponent {

@@ -81,6 +81,7 @@ class ofxDatGuiTheme{
         
         // global gui background color //
             ofColor guiBackground = ofColor::fromHex(0x303030);
+            ofColor panelHeader = ofColor::fromHex(0x3A3A3A); // slightly lighter than background
         
         // general colors that are shared by all components //
             ofColor label = ofColor::fromHex(0xEEEEEE);

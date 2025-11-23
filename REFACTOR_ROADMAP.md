@@ -133,15 +133,15 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 
 **Goal:** theme and layout are explicit, not magical.
 
-- [ ] Make `ofxDatGui` own the theme:
-  - [ ] `std::unique_ptr<ofxDatGuiTheme> theme;`
-  - [ ] `void setTheme(std::unique_ptr<ofxDatGuiTheme> t);`
+- [x] Make `ofxDatGui` own the theme:
+  - [x] `std::unique_ptr<ofxDatGuiTheme> theme;`
+  - [x] `void setTheme(std::unique_ptr<ofxDatGuiTheme> t);`
   - [ ] Possibly keep a convenience `setTheme(const ofxDatGuiTheme& t)` that copies.
-- [ ] Implement theme propagation:
-  - [ ] Add `applyThemeRecursive()` on root that:
-    - [ ] Applies theme to root.
-    - [ ] Walks through all `items` and all container children, calling `component->applyTheme(theme.get());`
-- [ ] Reduce or remove static/global theme access where possible:
+- [x] Implement theme propagation:
+  - [x] Apply theme across root/items when setTheme runs:
+    - [x] Applies theme to root and items when theme change is processed.
+    - [x] Walks through all `items` (and their children) calling `setTheme(theme.get())`.
+- [~] Reduce static/global theme access where possible (root now owns/applyTheme; still uses default static as fallback).
   - [ ] Prefer root-owned theme passed down / referenced.
 - [ ] Layout:
   - [ ] Ensure `ofxDatGuiContainer::layoutChildren()` is called:

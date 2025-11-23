@@ -34,15 +34,25 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 {
     
     public:
-        using ComponentPtr = std::unique_ptr<ofxDatGuiComponent>;
+        struct ComponentDeleter {
+            bool owning = true;
+            void operator()(ofxDatGuiComponent* p) const { if (owning) delete p; }
+        };
+        using ComponentPtr = std::unique_ptr<ofxDatGuiComponent, ComponentDeleter>;
         enum class Orientation {
             VERTICAL,
             HORIZONTAL
         };
     
+        ofxDatGui(); // stack-friendly default (no anchor)
         ofxDatGui(int x, int y);
-        ofxDatGui(ofxDatGuiAnchor anchor = ofxDatGuiAnchor::TOP_LEFT);
+        explicit ofxDatGui(ofxDatGuiAnchor anchor);
         ~ofxDatGui();
+
+        // ofxGui-like setup helpers so callers can default-construct and configure later.
+        void setup(); // defaults to NO_ANCHOR
+        void setup(int x, int y); // manual position
+        void setup(ofxDatGuiAnchor anchor);
     
         void draw();
         void update();
@@ -58,7 +68,10 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void setPosition(int x, int y);
         void setPosition(ofxDatGuiAnchor anchor);
         void setTheme(ofxDatGuiTheme* t, bool applyImmediately = false);
+        void setTheme(std::unique_ptr<ofxDatGuiTheme> t, bool applyImmediately = true);
         void setAutoDraw(bool autodraw, int priority = 0);
+        void setManualLayout(bool manual) { mManualLayout = manual; }
+        void relayout(); // explicit layout recompute without repositioning children
         void setLabelAlignment(ofxDatGuiAlignment align);
 
 		void setOrientation(Orientation orientation);
@@ -104,8 +117,8 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
             float x2 = 0.25f, float y2 = 1.00f,
             float padAspect = 1.0f)
         {
-            auto bez = std::make_unique<ofxDatGuiCubicBezier>(label, x1, y1, x2, y2, padAspect);
-            auto * raw = bez.get();
+            auto bez = makeOwned<ofxDatGuiCubicBezier>(label, x1, y1, x2, y2, padAspect);
+            auto * raw = static_cast<ofxDatGuiCubicBezier*>(bez.get());
             // If you later want GUI-level routing, you can add a callback like other components.
             attachItem(std::move(bez));
             return raw;
@@ -114,8 +127,8 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options);
         // LoopyDev: add Curve Editor
         ofxDatGuiCurveEditor * addCurveEditor(string label, float padAspect) {
-            auto curve = std::make_unique<ofxDatGuiCurveEditor>("Response Curve", 0.6f /*padAspect*/);
-            auto * raw = curve.get();
+            auto curve = makeOwned<ofxDatGuiCurveEditor>("Response Curve", 0.6f /*padAspect*/);
+            auto * raw = static_cast<ofxDatGuiCurveEditor*>(curve.get());
             attachItem(std::move(curve));
             return raw;
         };
@@ -124,6 +137,8 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 			const std::vector<std::string> & buttons);
 		// LoopyDev: add panel
 		ofxDatGuiPanel * addPanel(ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
+        ofxDatGuiPanel& createPanel(const std::string& label = "", ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
+        ofxDatGuiPanel& attachPanel(ofxDatGuiPanel& panel, const std::string& label = "", ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
 
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();
@@ -153,11 +168,13 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         float mAlpha;
         float mLabelWidth;
         bool mMoving;
+        bool mIsSetup = false;
         bool mVisible;
         bool mEnabled;
         bool mExpanded;
         bool mAutoDraw;
         bool mMouseDown;
+        bool mManualLayout = true;
         ofxDatGuiComponent* mMouseCaptureOwner = nullptr;
         bool mAlphaChanged;
         bool mWidthChanged;
@@ -172,7 +189,9 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         ofxDatGuiAnchor mAnchor;
         ofxDatGuiHeader* mGuiHeader;
         ofxDatGuiFooter* mGuiFooter;
-        ofxDatGuiTheme* mTheme;
+        std::unique_ptr<ofxDatGuiTheme> mOwnedTheme;
+        std::unique_ptr<ofxDatGuiTheme> mPendingOwnedTheme;
+        ofxDatGuiTheme* mPendingBorrowedTheme = nullptr;
         ofxDatGuiAlignment mAlignment;
         std::vector<ComponentPtr> items;
         vector<ofxDatGuiComponent*> trash;
@@ -181,11 +200,18 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         static std::unique_ptr<ofxDatGuiTheme> theme;
     
         void init();
+        void ensureSetup();
         void layoutGui();
     	void positionGui();
         void moveGui(ofPoint pt);
         bool hitTest(ofPoint pt);
         void attachItem(ComponentPtr item);
+        template<typename T, typename... Args>
+        std::unique_ptr<T, ComponentDeleter> makeOwned(Args&&... args) {
+            return std::unique_ptr<T, ComponentDeleter>(new T(std::forward<Args>(args)...), ComponentDeleter{true});
+        }
+        ComponentPtr makeBorrowed(ofxDatGuiComponent& ref);
+        void applyThemeRecursive(ofxDatGuiComponent* node, const ofxDatGuiTheme* t);
     
         void onDraw(ofEventArgs &e);
         void onUpdate(ofEventArgs &e);
