@@ -80,7 +80,7 @@ public:
 		// Use theme to pick up spacing & style.
 		setComponentStyle(theme);
 		mSpacing = theme->layout.vMargin;
-		mStyle.height = mHeaderHeight;
+		mStyle.height = mHeaderEnabled ? mHeaderHeight : 0;
 
 		// Propagate theme to children
 		for (auto & c : children) {
@@ -105,13 +105,15 @@ public:
 		//
 		// So: temporarily clear our children list, call base setWidth,
 		// then restore children and relayout.
-		std::vector<ComponentPtr> savedChildren;
-		savedChildren.swap(children);
-
-		ofxDatGuiComponent::setWidth(width, labelWidth);
-
-		children.swap(savedChildren);
-
+		mStyle.width = width;
+		if (labelWidth > 1) {
+			mLabel.width = labelWidth;
+		} else {
+			mLabel.width = mStyle.width * labelWidth;
+		}
+		mIcon.x = mStyle.width - (mStyle.width * .05) - mIcon.size;
+		mLabel.rightAlignedXpos = mLabel.width - mLabel.margin;
+		positionLabel();
 		layoutChildren();
 	}
 
@@ -128,7 +130,7 @@ public:
 	void setHeaderEnabled(bool enable = true, int headerHeight = 24) {
 		mHeaderEnabled = enable;
 		mHeaderHeight = headerHeight;
-		mStyle.height = mHeaderHeight;
+		mStyle.height = mHeaderEnabled ? mHeaderHeight : 0;
 		layoutChildren();
 	}
 
@@ -163,16 +165,60 @@ public:
 		if (!mVisible) return;
 
 		ofPushStyle();
+
+		ofColor headerColor = mStyle.color.background;
+		if (const ofxDatGuiTheme* t = ofxDatGuiComponent::getTheme()) {
+			headerColor = t->color.panelHeader;
+		}
+
 		if (mHeaderEnabled) {
-			ofColor headerColor = mStyle.color.background;
-			if (const ofxDatGuiTheme* t = ofxDatGuiComponent::getTheme()) {
-				headerColor = t->color.panelHeader;
-			}
 			ofSetColor(headerColor, mStyle.opacity * 255);
 			ofDrawRectangle(x, y, mStyle.width, mHeaderHeight);
 			ofSetColor(mLabel.color);
 			if (mFont) {
 				mFont->draw(mLabel.rendered, x + mLabel.x, y + mHeaderHeight/2 + mLabel.rect.height/2);
+			}
+		}
+
+		// Fill the spacing gaps with the same color as the header so they aren't transparent.
+		if (mSpacing > 0) {
+			ofSetColor(headerColor, mStyle.opacity * 255);
+			if (mOrientation == Orientation::VERTICAL) {
+				ofxDatGuiComponent* previous = nullptr;
+				for (auto& c : children) {
+					if (!c->getVisible()) continue;
+					if (previous != nullptr) {
+						int gapY = previous->getY() + previous->getHeight();
+						int gapH = c->getY() - gapY;
+						if (gapH > 0) {
+							ofDrawRectangle(x, gapY, mStyle.width, gapH);
+						}
+					}
+					previous = c.get();
+				}
+			} else {
+				int rowY = y + (mHeaderEnabled ? mHeaderHeight : 0);
+				int rowHeight = std::max(0, mHeight - (mHeaderEnabled ? mHeaderHeight : 0));
+				if (rowHeight == 0) {
+					for (auto& c : children) {
+						if (!c->getVisible()) continue;
+						rowHeight = std::max(rowHeight, c->getHeight());
+					}
+				}
+				if (rowHeight > 0) {
+					ofxDatGuiComponent* previous = nullptr;
+					for (auto& c : children) {
+						if (!c->getVisible()) continue;
+						if (previous != nullptr) {
+							int gapX = previous->getX() + previous->getWidth();
+							int gapW = c->getX() - gapX;
+							if (gapW > 0) {
+								ofDrawRectangle(gapX, rowY, gapW, rowHeight);
+							}
+						}
+						previous = c.get();
+					}
+				}
 			}
 		}
 		// Panel itself stays visually transparent by default.
@@ -401,6 +447,16 @@ protected:
 	void onMouseRelease(ofVec3f m) override {
 		mDragging = false;
 		ofxDatGuiComponent::onMouseRelease(m);
+	}
+
+	bool hitTest(ofPoint m) override {
+		// Use full panel bounds (header + children), not just header height.
+		int h = mHeight;
+		// If layout hasn't run yet, fall back to header height.
+		if (h <= 0) {
+			h = mHeaderEnabled ? mHeaderHeight : 0;
+		}
+		return (m.x >= x && m.x <= x + mStyle.width && m.y >= y && m.y <= y + h);
 	}
 
 

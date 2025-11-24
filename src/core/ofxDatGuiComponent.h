@@ -69,9 +69,12 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
 		// LoopyDev: Stripe config
 		void setStripePosition(StripePosition position);
 		StripePosition getStripePosition() const;
-		ofColor getStripeColor() const { return mStyle.stripe.color; }
-		int getStripeWidth() const { return mStyle.stripe.width; }
-		bool getStripeVisible() const { return mStyle.stripe.visible; }
+        ofColor getStripeColor() const { return mStyle.stripe.color; }
+        int getStripeWidth() const { return mStyle.stripe.width; }
+        bool getStripeVisible() const { return mStyle.stripe.visible; }
+        float getOpacity() const { return mStyle.opacity / 255.f; }
+        void setIconColor(ofColor c) { mIcon.color = c; }
+        void applyMutedPalette(const ofxDatGuiTheme* theme, bool muted);
 
         void    setBorder(ofColor color, int width);
         void    setBorderVisible(bool visible);
@@ -98,6 +101,7 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         virtual void setTheme(const ofxDatGuiTheme* theme) = 0;
         virtual void setWidth(int width, float labelWidth);
         virtual void setLabelAlignment(ofxDatGuiAlignment align);
+        float   getLabelWidth() const { return mLabel.width; }
     
         virtual int  getWidth();
         virtual int  getHeight();
