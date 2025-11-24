@@ -110,6 +110,8 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         // Root association (non-owning).
         virtual void setRoot(ofxDatGui* r) { mRoot = r; }
         ofxDatGui* getRoot() const { return mRoot; }
+        void setParent(ofxDatGuiComponent* p) { mParent = p; }
+        ofxDatGuiComponent* getParent() const { return mParent; }
 
         virtual void onFocus();    
         virtual void onFocusLost();
@@ -137,6 +139,7 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         bool mMouseOver;
         bool mMouseDown;
         ofxDatGui* mRoot = nullptr;
+        ofxDatGuiComponent* mParent = nullptr;
 
         ofRectangle mMask;
         ofxDatGuiType mType;

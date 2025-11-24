@@ -401,6 +401,18 @@ static bool mousePressedThisFrame() {
 }
 
 void ofxDatGuiComponent::update(bool acceptEvents) {
+	if (!acceptEvents || !mEnabled || !mVisible) {
+		// Skip interaction/hover when events are blocked or we're disabled/hidden.
+		mMouseOver = false;
+		// Do not force-release capture here; owner manages it.
+		if (this->getIsExpanded()) {
+			forEachChild([&](ofxDatGuiComponent* c){
+				if (c->getVisible()) c->update(false);
+			});
+		}
+		return;
+	}
+
 	const bool mp = ofGetMousePressed();
 	const bool justPressed = mousePressedThisFrame(); // only true on the transition frame
 

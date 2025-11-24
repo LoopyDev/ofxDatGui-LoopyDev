@@ -71,6 +71,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void setTheme(std::unique_ptr<ofxDatGuiTheme> t, bool applyImmediately = true);
         void setAutoDraw(bool autodraw, int priority = 0);
         void setManualLayout(bool manual) { mManualLayout = manual; }
+        void setBringToFrontOnInteract(bool enable) { ensureSetup(); mBringToFrontOnInteract = enable; }
         void relayout(); // explicit layout recompute without repositioning children
         void setLabelAlignment(ofxDatGuiAlignment align);
 
@@ -175,6 +176,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool mAutoDraw;
         bool mMouseDown;
         bool mManualLayout = true;
+        bool mBringToFrontOnInteract = false;
         ofxDatGuiComponent* mMouseCaptureOwner = nullptr;
         bool mAlphaChanged;
         bool mWidthChanged;
@@ -206,6 +208,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void moveGui(ofPoint pt);
         bool hitTest(ofPoint pt);
         void attachItem(ComponentPtr item);
+        void bringItemToFront(ofxDatGuiComponent* component);
         template<typename T, typename... Args>
         std::unique_ptr<T, ComponentDeleter> makeOwned(Args&&... args) {
             return std::unique_ptr<T, ComponentDeleter>(new T(std::forward<Args>(args)...), ComponentDeleter{true});

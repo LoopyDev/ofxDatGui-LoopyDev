@@ -21,6 +21,7 @@
 */
 
 #include "ofxDatGui.h"
+#include <unordered_map>
 
 ofxDatGui* ofxDatGui::mActiveGui;
 vector<ofxDatGui*> ofxDatGui::mGuis;
@@ -303,6 +304,9 @@ void ofxDatGui::setMouseCapture(ofxDatGuiComponent* c)
 {
 	ensureSetup();
 	mMouseCaptureOwner = c;
+    if (mBringToFrontOnInteract && c != nullptr) {
+        bringItemToFront(c);
+    }
 }
 
 ofxDatGuiComponent* ofxDatGui::getMouseCapture() const
@@ -627,8 +631,56 @@ void ofxDatGui::attachItem(ComponentPtr item)
         items.push_back(std::move(item));
     }
     raw->setRoot(this);
+    raw->setParent(nullptr);
     raw->onInternalEvent(this, &ofxDatGui::onInternalEventCallback);
     layoutGui();
+}
+
+void ofxDatGui::bringItemToFront(ofxDatGuiComponent* component) {
+    if (!component) return;
+    // Climb to the top-most component owned by this gui.
+    ofxDatGuiComponent* top = component;
+    while (top->getParent() != nullptr) {
+        top = top->getParent();
+    }
+    if (top->getRoot() != this) return;
+
+    auto it = std::find_if(items.begin(), items.end(), [&](const ComponentPtr& ptr) {
+        return ptr.get() == top;
+    });
+    if (it == items.end()) return;
+    // Already front-most
+    if (std::next(it) == items.end()) return;
+
+    // Preserve manual layout positions so reordering only affects z-order.
+    std::unordered_map<ofxDatGuiComponent*, ofPoint> positions;
+    if (mManualLayout) {
+        for (auto & item : items) {
+            positions[item.get()] = ofPoint(item->getX(), item->getY());
+        }
+    }
+
+    ComponentPtr moved = std::move(*it);
+    items.erase(it);
+    items.push_back(std::move(moved));
+
+    // Refresh indices for consistent callbacks.
+    for (int i = 0; i < items.size(); ++i) {
+        items[i]->setIndex(i);
+    }
+
+    if (mManualLayout) {
+        for (auto & item : items) {
+            auto posIt = positions.find(item.get());
+            if (posIt != positions.end()) {
+                item->setPosition(posIt->second.x, posIt->second.y);
+            }
+        }
+        // Update bounds only.
+        layoutGui();
+    } else {
+        layoutGui();
+    }
 }
 
 ofxDatGui::ComponentPtr ofxDatGui::makeBorrowed(ofxDatGuiComponent& ref)
@@ -1160,7 +1212,7 @@ void ofxDatGui::update()
         if (mWidthChanged) items[i]->setWidth(mWidth, mLabelWidth);
         if (mAlignmentChanged) items[i]->setLabelAlignment(mAlignment);
     }
-    
+
     if (mThemeChanged || mWidthChanged) layoutGui();
 
     mAlphaChanged = false;
@@ -1172,6 +1224,39 @@ void ofxDatGui::update()
         for (int i = 0; i < items.size(); i++)
             items[i]->update(false);
     } else {
+        // Determine which top-level item should receive interaction:
+        // - If there's an active mouse capture, route to that item's top-level owner.
+        // - Otherwise, only the topmost visible item under the mouse gets hover/press.
+        auto toTopLevel = [&](ofxDatGuiComponent* c) -> ofxDatGuiComponent* {
+            while (c && c->getParent() != nullptr) {
+                c = c->getParent();
+            }
+            if (c && c->getRoot() != this) return nullptr;
+            return c;
+        };
+        auto containsPoint = [&](auto&& self, ofxDatGuiComponent* node, const ofPoint& pt) -> bool {
+            if (!node || !node->getVisible()) return false;
+            if (node->hitTest(pt)) return true;
+            bool hit = false;
+            node->forEachChild([&](ofxDatGuiComponent* c) {
+                if (!hit && self(self, c, pt)) hit = true;
+            });
+            return hit;
+        };
+
+        ofxDatGuiComponent* interactionTarget = toTopLevel(mMouseCaptureOwner);
+        if (interactionTarget == nullptr) {
+            ofPoint mouse(ofGetMouseX(), ofGetMouseY());
+            for (int i = static_cast<int>(items.size()) - 1; i >= 0; --i) {
+                auto * it = items[i].get();
+                if (!it->getVisible()) continue;
+                if (containsPoint(containsPoint, it, mouse)) {
+                    interactionTarget = it;
+                    break;
+                }
+            }
+        }
+
         if (mThemeChanged) {
             const ofxDatGuiTheme* pending = mPendingOwnedTheme ? mPendingOwnedTheme.get() : mPendingBorrowedTheme;
             if (pending) {
@@ -1196,10 +1281,11 @@ void ofxDatGui::update()
 			mMouseDown = mGuiFooter->getMouseDown();
 		} else {
 			// 1) Update every item; component layer uses root-managed capture
-			//    so only the owning component reacts.
-			for (int i = 0; i < items.size(); ++i) {
-				items[i]->update(true);
-			}
+			//    so only the owning component reacts. Limit to the topmost hovered item when stacked.
+            for (int i = 0; i < items.size(); ++i) {
+                const bool allowEvents = (interactionTarget == nullptr) ? true : (items[i].get() == interactionTarget);
+                items[i]->update(allowEvents);
+            }
 
 			// 2) Panel-level mMouseDown = any descendant is down
 			// Helper: recursively check descendants for mouse down, against raw child pointers (legacy).
