@@ -38,3 +38,45 @@ Restructuring horizontally stacked gui components. To add a horizontally stacked
 	row->attachItem(new ofxDatGuiButton("Pause"));
 	row->attachItem(new ofxDatGuiButton("Stop"));
 	row->attachItem(new ofxDatGuiButton("Okeyyeh"));
+
+---
+
+## Quick setup & panel patterns
+
+Anchors are deprecated; everything is manual layout. `ofxDatGui` defaults to `setAutoDraw(true)` so you usually don't need to call `draw()`/`update()` yourself unless you disable autodraw.
+
+```cpp
+// ofApp.h
+ofxDatGui gui;                // gui-owned components live inside this
+ofxDatGuiPanel stackPanel;    // stack-owned panel you keep alive yourself
+```
+
+```cpp
+// ofApp.cpp
+void ofApp::setup() {
+    gui.setup();                     // manual layout, auto draw/update enabled
+    gui.setPosition(40, 40);
+    gui.setWidth(320);
+
+    // 1) Dynamic/gui-owned panel (lifetime tied to gui)
+    auto& dyn = gui.createPanel("Dynamic Panel", ofxDatGuiPanel::Orientation::VERTICAL);
+    dyn.setHeaderEnabled(true);
+    dyn.setPosition(40, 40);         // always position panels manually
+    dyn.addButton("Hello");
+    dyn.addToggle("World", false);
+
+    // 2) Stack-owned panel you attach to the gui
+    stackPanel.setHeaderEnabled(true);
+    stackPanel.addButton("External A");
+    stackPanel.addButton("External B");
+
+    // Attach hands theme/width/ownership to the gui while you keep the object alive.
+    gui.attachPanel(stackPanel, "Attached Panel", ofxDatGuiPanel::Orientation::HORIZONTAL);
+    stackPanel.setPosition(40, 200);
+    stackPanel.setWidth(480, 0.35f);
+}
+```
+
+- `createPanel(...)`/`addPanel(...)`: gui creates & owns the panel; destroyed with `gui`. Width/theme are inherited automatically.
+- `attachPanel(panel, ...)`: plug in a stack-owned panel; caller keeps it alive. `attachPanel` will set the label/orientation/theme/width to match the gui, but you still position it manually.
+- If you keep a stack-owned panel *detached* (not attached to a gui), set its theme yourself (`panel.setTheme(ofxDatGuiComponent::getTheme())`), and call `panel.update()` / `panel.draw()` manually.
