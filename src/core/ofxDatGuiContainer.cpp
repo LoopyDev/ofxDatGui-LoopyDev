@@ -6,6 +6,7 @@ void ofxDatGuiContainer::emplaceChild(ComponentPtr child) {
 
 	// Phase 1: Set up child with proper index and root pointer.
 	child->setIndex(static_cast<int>(children.size()));
+	child->setParent(this);
 	child->setRoot(getRoot());
 	
 	// Take ownership and trigger layout update.
@@ -19,8 +20,13 @@ void ofxDatGuiContainer::update(bool parentEnabled) {
 	// delegating to children.
 	ofxDatGuiComponent::update(parentEnabled);
 
+	// If parent blocked interaction or we're disabled, children should also be blocked.
+	if (!parentEnabled || !getEnabled()) {
+		return;
+	}
+
 	// Update children with combined enabled state.
-	const bool enabled = parentEnabled && getEnabled();
+	const bool enabled = true; // parentEnabled && getEnabled() is already true here
 	for (auto & child : children) {
 		child->update(enabled);
 	}

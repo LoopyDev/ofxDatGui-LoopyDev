@@ -80,3 +80,4 @@ void ofApp::setup() {
 - `createPanel(...)`/`addPanel(...)`: gui creates & owns the panel; destroyed with `gui`. Width/theme are inherited automatically.
 - `attachPanel(panel, ...)`: plug in a stack-owned panel; caller keeps it alive. `attachPanel` will set the label/orientation/theme/width to match the gui, but you still position it manually.
 - If you keep a stack-owned panel *detached* (not attached to a gui), set its theme yourself (`panel.setTheme(ofxDatGuiComponent::getTheme())`), and call `panel.update()` / `panel.draw()` manually.
+- Optional z-order: `gui.setBringToFrontOnInteract(true)` raises the most recently interacted top-level item in draw order without changing manual positions.
