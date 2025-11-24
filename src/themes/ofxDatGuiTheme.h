@@ -90,6 +90,18 @@ class ofxDatGuiTheme{
             ofColor backgroundOnMouseOver = ofColor::fromHex(0x777777);
             ofColor backgroundOnMouseDown = ofColor::fromHex(0x222222);
             ofColor inputAreaBackground = ofColor::fromHex(0x303030);
+
+            // Muted variant (used when panels are unfocused).
+            struct MutedColors {
+                ofColor guiBackground = ofColor::fromHex(0x252525);
+                ofColor panelHeader = ofColor::fromHex(0x2F2F2F);
+                ofColor label = ofColor::fromHex(0xAAAAAA);
+                ofColor icons = ofColor::fromHex(0xAAAAAA);
+                ofColor background = ofColor::fromHex(0x141414);
+                ofColor backgroundOnMouseOver = ofColor::fromHex(0x555555);
+                ofColor backgroundOnMouseDown = ofColor::fromHex(0x1C1C1C);
+                ofColor inputAreaBackground = ofColor::fromHex(0x2A2A2A);
+            } muted;
             
         // component specific colors //
             struct {
@@ -151,6 +163,18 @@ class ofxDatGuiTheme{
             ofColor dropdown = ofColor::fromHex(0xC63256);
             ofColor textInput = ofColor::fromHex(0x1ED36F);
             ofColor colorPicker = ofColor::fromHex(0xFFD00B);
+            struct MutedStripes {
+                ofColor label = ofColor::fromHex(0xAAAAAA);
+                ofColor button = ofColor::fromHex(0x7F6A20);
+                ofColor toggle = ofColor::fromHex(0x7F6A20);
+                ofColor slider = ofColor::fromHex(0x1F5E7F);
+                ofColor pad2d = ofColor::fromHex(0x6C9F6A);
+                ofColor matrix = ofColor::fromHex(0x6A5210);
+                ofColor graph = ofColor::fromHex(0x6C9F6A);
+                ofColor dropdown = ofColor::fromHex(0x7A2D45);
+                ofColor textInput = ofColor::fromHex(0x197A52);
+                ofColor colorPicker = ofColor::fromHex(0x7F6A20);
+            } muted;
         } stripe;
     
 

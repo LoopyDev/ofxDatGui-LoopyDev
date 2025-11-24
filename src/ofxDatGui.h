@@ -72,6 +72,8 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void setAutoDraw(bool autodraw, int priority = 0);
         void setManualLayout(bool manual) { mManualLayout = manual; }
         void setBringToFrontOnInteract(bool enable) { ensureSetup(); mBringToFrontOnInteract = enable; }
+        void setMuteUnfocusedPanels(bool enable) { ensureSetup(); mMuteUnfocusedPanels = enable; }
+        void setActiveOnHover(bool enable) { ensureSetup(); mActiveOnHover = enable; }
         void relayout(); // explicit layout recompute without repositioning children
         void setLabelAlignment(ofxDatGuiAlignment align);
 
@@ -139,7 +141,11 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 		// LoopyDev: add panel
 		ofxDatGuiPanel * addPanel(ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
         ofxDatGuiPanel& createPanel(const std::string& label = "", ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
-        ofxDatGuiPanel& attachPanel(ofxDatGuiPanel& panel, const std::string& label = "", ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
+        // attachPanel: by default preserves the panel's existing orientation.
+        // Pass overrideOrientation=true to force a new orientation.
+        ofxDatGuiPanel& attachPanel(ofxDatGuiPanel& panel, const std::string& label = "",
+            ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL,
+            bool overrideOrientation = false);
 
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();
@@ -177,6 +183,9 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool mMouseDown;
         bool mManualLayout = true;
         bool mBringToFrontOnInteract = false;
+        bool mMuteUnfocusedPanels = false;
+        bool mActiveOnHover = false;
+        ofxDatGuiComponent* mLastFocusedPanel = nullptr;
         ofxDatGuiComponent* mMouseCaptureOwner = nullptr;
         bool mAlphaChanged;
         bool mWidthChanged;
@@ -207,7 +216,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
     	void positionGui();
         void moveGui(ofPoint pt);
         bool hitTest(ofPoint pt);
-        void attachItem(ComponentPtr item);
+        void attachItem(ComponentPtr item, bool applyTheme = true);
         void bringItemToFront(ofxDatGuiComponent* component);
         template<typename T, typename... Args>
         std::unique_ptr<T, ComponentDeleter> makeOwned(Args&&... args) {

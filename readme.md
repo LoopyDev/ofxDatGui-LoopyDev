@@ -25,6 +25,7 @@
 - Continued cleanup of manual layout defaults and API polish
 - More examples showcasing stack-owned panels + dynamic panels
 - Bring-to-front z-ordering for GUI-owned panels (drag headers to raise)
+- Panel drag bounds (prevent panels from being dragged outside the window)
 
 ![ofxDatGui-LoopyDev](https://loopydev.co.uk/img/software/ofxDatGui-LoopyDev/gallery/1.webp "ofxDatGui-LoopyDev")  
 
@@ -78,6 +79,6 @@ void ofApp::setup() {
 ```
 
 - `createPanel(...)`/`addPanel(...)`: gui creates & owns the panel; destroyed with `gui`. Width/theme are inherited automatically.
-- `attachPanel(panel, ...)`: plug in a stack-owned panel; caller keeps it alive. `attachPanel` will set the label/orientation/theme/width to match the gui, but you still position it manually.
+- `attachPanel(panel, ...)`: plug in a stack-owned panel; caller keeps it alive. `attachPanel` will set the label/theme and respect any width you already set (it only applies the gui width if the panel had none). Pass `overrideOrientation=true` if you want the gui call to change orientation; otherwise the panel keeps whatever orientation you set beforehand.
 - If you keep a stack-owned panel *detached* (not attached to a gui), set its theme yourself (`panel.setTheme(ofxDatGuiComponent::getTheme())`), and call `panel.update()` / `panel.draw()` manually.
 - Optional z-order: `gui.setBringToFrontOnInteract(true)` raises the most recently interacted top-level item in draw order without changing manual positions.

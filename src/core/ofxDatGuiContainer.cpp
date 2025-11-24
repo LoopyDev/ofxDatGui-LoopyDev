@@ -25,10 +25,23 @@ void ofxDatGuiContainer::update(bool parentEnabled) {
 		return;
 	}
 
-	// Update children with combined enabled state.
-	const bool enabled = true; // parentEnabled && getEnabled() is already true here
+	// Only the topmost visible child under the mouse should receive interaction;
+	// others still tick but ignore input. This prevents stacked siblings from both
+	// reacting when overlapped.
+	ofxDatGuiComponent* hotChild = nullptr;
+	ofPoint mouse(ofGetMouseX(), ofGetMouseY());
+	for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
+		auto & c = children[i];
+		if (!c || !c->getVisible()) continue;
+		if (c->hitTest(mouse)) {
+			hotChild = c.get();
+			break;
+		}
+	}
+
 	for (auto & child : children) {
-		child->update(enabled);
+		const bool allow = (hotChild == nullptr) ? true : (child.get() == hotChild);
+		child->update(allow);
 	}
 }
 

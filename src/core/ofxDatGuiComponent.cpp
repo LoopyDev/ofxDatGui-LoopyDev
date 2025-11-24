@@ -367,6 +367,35 @@ ofxDatGuiComponent::StripePosition ofxDatGuiComponent::getStripePosition() const
 	return mStyle.stripe.position;
 }
 
+void ofxDatGuiComponent::applyMutedPalette(const ofxDatGuiTheme* theme, bool muted) {
+	if (theme == nullptr) theme = ofxDatGuiComponent::getTheme();
+	if (theme == nullptr) return;
+
+	// Pick muted or normal palettes field-by-field to avoid type mismatch.
+	ofColor bg = muted ? theme->color.muted.background : theme->color.background;
+	ofColor bgOver = muted ? theme->color.muted.backgroundOnMouseOver : theme->color.backgroundOnMouseOver;
+	ofColor bgDown = muted ? theme->color.muted.backgroundOnMouseDown : theme->color.backgroundOnMouseDown;
+	ofColor label = muted ? theme->color.muted.label : theme->color.label;
+	ofColor icon = muted ? theme->color.muted.icons : theme->color.icons;
+
+	setBackgroundColors(bg, bgOver, bgDown);
+	setLabelColor(label);
+	setIconColor(icon);
+
+	// Stripe mapping by component type.
+	switch (getType()) {
+	case ofxDatGuiType::LABEL:      setStripeColor(muted ? theme->stripe.muted.label : theme->stripe.label); break;
+	case ofxDatGuiType::BUTTON:     setStripeColor(muted ? theme->stripe.muted.button : theme->stripe.button); break;
+	case ofxDatGuiType::TOGGLE:     setStripeColor(muted ? theme->stripe.muted.toggle : theme->stripe.toggle); break;
+	case ofxDatGuiType::SLIDER:     setStripeColor(muted ? theme->stripe.muted.slider : theme->stripe.slider); break;
+	case ofxDatGuiType::PAD2D:      setStripeColor(muted ? theme->stripe.muted.pad2d : theme->stripe.pad2d); break;
+	case ofxDatGuiType::MATRIX:     setStripeColor(muted ? theme->stripe.muted.matrix : theme->stripe.matrix); break;
+	case ofxDatGuiType::DROPDOWN:   setStripeColor(muted ? theme->stripe.muted.dropdown : theme->stripe.dropdown); break;
+	case ofxDatGuiType::TEXT_INPUT: setStripeColor(muted ? theme->stripe.muted.textInput : theme->stripe.textInput); break;
+	case ofxDatGuiType::COLOR_PICKER: setStripeColor(muted ? theme->stripe.muted.colorPicker : theme->stripe.colorPicker); break;
+	default:                        setStripeColor(muted ? theme->stripe.muted.label : theme->stripe.label); break;
+	}
+}
 
 void ofxDatGuiComponent::setBorder(ofColor color, int width)
 {
@@ -432,7 +461,7 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 	// If this is an expanded container, don't steal presses that begin in the child area (below header).
 	bool hasChild = false;
 	forEachChild([&](ofxDatGuiComponent*){ hasChild = true; });
-	const bool pressInChildRegion = getIsExpanded() && hasChild && (ofGetMouseY() > y + mStyle.height);
+	const bool pressInChildRegion = getIsExpanded() && hasChild && (ofGetMouseY() >= y + mStyle.height);
 
 	// Block highlighting on drag-in or while another widget owns the press:
 	const bool over = hoverAllowed && overGeom;
@@ -453,7 +482,7 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 				if (!mFocused) onFocus();
 			}
 			// else: press started elsewhere > ignore (no capture on drag-in)
-		} else {
+	} else {
 			if (capture == this) {
 				// Mouse went up; we were the owner ? release, even if mMouseDown was toggled elsewhere
 				onMouseRelease(mouseAbs);
@@ -464,7 +493,8 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 				onMouseRelease(mouseAbs);
 				mMouseDown = false;
 			} else if (mMouseDown) {
-				// Lost capture elsewhere; reset local state
+				// Lost capture elsewhere; still dispatch a release to avoid stuck presses / missed clicks.
+				onMouseRelease(mouseAbs);
 				mMouseDown = false;
 			}
 		}

@@ -75,8 +75,8 @@ void ofxDatGui::init()
 
 	mOrientation = Orientation::VERTICAL;
 
-// enable autodraw by default //
-    setAutoDraw(true, mGuis.size());
+// autodraw disabled by default; caller must invoke update()/draw()
+    setAutoDraw(false, mGuis.size());
     
 // assign focus to this newly created gui //
     mActiveGui = this;
@@ -306,6 +306,12 @@ void ofxDatGui::setMouseCapture(ofxDatGuiComponent* c)
 	mMouseCaptureOwner = c;
     if (mBringToFrontOnInteract && c != nullptr) {
         bringItemToFront(c);
+    }
+    // Track last focused top-level for muting/unmuting.
+    if (c != nullptr) {
+        ofxDatGuiComponent* top = c;
+        while (top->getParent() != nullptr) top = top->getParent();
+        if (top->getRoot() == this) mLastFocusedPanel = top;
     }
 }
 
@@ -600,31 +606,68 @@ ofxDatGuiPanel& ofxDatGui::createPanel(const std::string& label, ofxDatGuiPanel:
     return *raw;
 }
 
-ofxDatGuiPanel& ofxDatGui::attachPanel(ofxDatGuiPanel& panel, const std::string& label, ofxDatGuiPanel::Orientation orientation) {
+ofxDatGuiPanel& ofxDatGui::attachPanel(ofxDatGuiPanel& panel, const std::string& label,
+    ofxDatGuiPanel::Orientation orientation, bool overrideOrientation) {
     ensureSetup();
-    panel.setOrientation(orientation);
+    const int prevWidth = panel.getWidth();
+    const float prevLabelWidth = panel.getLabelWidth();
+    // Snapshot stripe state for panel and all descendants to restore after theme.
+    struct StripeState {
+        ofxDatGuiComponent* c;
+        ofColor color;
+        int width;
+        bool visible;
+        ofxDatGuiComponent::StripePosition pos;
+    };
+    std::vector<StripeState> stripeStates;
+    std::function<void(ofxDatGuiComponent*)> snapshot = [&](ofxDatGuiComponent* c) {
+        if (!c) return;
+        stripeStates.push_back(StripeState{ c, c->getStripeColor(), c->getStripeWidth(), c->getStripeVisible(), c->getStripePosition() });
+        c->forEachChild(snapshot);
+    };
+    snapshot(&panel);
+
+    if (overrideOrientation) {
+        panel.setOrientation(orientation);
+    }
     if (!label.empty()) panel.setLabel(label);
     const ofxDatGuiTheme* themeToUse = mOwnedTheme ? mOwnedTheme.get() : ofxDatGuiComponent::getTheme();
     panel.setTheme(themeToUse);
-    panel.setWidth(mWidth, mLabelWidth);
+
+    // Restore caller-set stripe properties recursively.
+    for (auto & st : stripeStates) {
+        st.c->setStripeColor(st.color);
+        st.c->setStripeWidth(st.width);
+        st.c->setStripeVisible(st.visible);
+        st.c->setStripePosition(st.pos);
+    }
+
+    // Respect caller-set width if present; otherwise adopt GUI width.
+    if (prevWidth > 0) {
+        panel.setWidth(prevWidth, prevLabelWidth);
+    } else {
+        panel.setWidth(mWidth, mLabelWidth);
+    }
     ComponentPtr ptr = makeBorrowed(panel);
-    attachItem(std::move(ptr));
+    attachItem(std::move(ptr), false); // theme already applied above
     return panel;
 }
 
 
 
-void ofxDatGui::attachItem(ComponentPtr item)
+void ofxDatGui::attachItem(ComponentPtr item, bool applyTheme)
 {
     if (!item) return;
     ensureSetup();
 
     auto * raw = item.get();
-    // Apply current theme to the new item (owned, pending-owned, or default).
-    const ofxDatGuiTheme* themeToUse = mOwnedTheme ? mOwnedTheme.get()
-        : (mPendingOwnedTheme ? mPendingOwnedTheme.get()
-            : (mPendingBorrowedTheme ? mPendingBorrowedTheme : ofxDatGuiComponent::getTheme()));
-    if (themeToUse) raw->setTheme(themeToUse);
+    if (applyTheme) {
+        // Apply current theme to the new item (owned, pending-owned, or default).
+        const ofxDatGuiTheme* themeToUse = mOwnedTheme ? mOwnedTheme.get()
+            : (mPendingOwnedTheme ? mPendingOwnedTheme.get()
+                : (mPendingBorrowedTheme ? mPendingBorrowedTheme : ofxDatGuiComponent::getTheme()));
+        if (themeToUse) raw->setTheme(themeToUse);
+    }
     if (mGuiFooter != nullptr){
         items.insert(items.end()-1, std::move(item));
     }   else {
@@ -1245,7 +1288,7 @@ void ofxDatGui::update()
         };
 
         ofxDatGuiComponent* interactionTarget = toTopLevel(mMouseCaptureOwner);
-        if (interactionTarget == nullptr) {
+        if (interactionTarget == nullptr && mActiveOnHover) {
             ofPoint mouse(ofGetMouseX(), ofGetMouseY());
             for (int i = static_cast<int>(items.size()) - 1; i >= 0; --i) {
                 auto * it = items[i].get();
@@ -1255,6 +1298,22 @@ void ofxDatGui::update()
                     break;
                 }
             }
+        } else if (interactionTarget == nullptr && !mActiveOnHover) {
+            // No capture and hover-to-activate disabled: only set on explicit press.
+            if (ofGetMousePressed()) {
+                ofPoint mouse(ofGetMouseX(), ofGetMouseY());
+                for (int i = static_cast<int>(items.size()) - 1; i >= 0; --i) {
+                    auto * it = items[i].get();
+                    if (!it->getVisible()) continue;
+                    if (containsPoint(containsPoint, it, mouse)) {
+                        interactionTarget = it;
+                        break;
+                    }
+                }
+            }
+        }
+        if (interactionTarget != nullptr) {
+            mLastFocusedPanel = interactionTarget;
         }
 
         if (mThemeChanged) {
@@ -1361,13 +1420,57 @@ void ofxDatGui::draw()
     ensureSetup();
     if (!mIsSetup) return;
     if (mVisible == false) return;
+
+    // Determine focused item for muting: prefer last interacted panel if still visible, otherwise topmost visible.
+    auto isOwned = [&](ofxDatGuiComponent* c) -> bool {
+        if (!c) return false;
+        auto it = std::find_if(items.begin(), items.end(), [&](const ComponentPtr& p){ return p.get() == c; });
+        return it != items.end();
+    };
+    ofxDatGuiComponent* topVisible = nullptr;
+    for (int i = static_cast<int>(items.size()) - 1; i >= 0; --i) {
+        if (items[i]->getVisible()) {
+            topVisible = items[i].get();
+            break;
+        }
+    }
+    ofxDatGuiComponent* focusForMute = nullptr;
+    if (mLastFocusedPanel && mLastFocusedPanel->getVisible() && isOwned(mLastFocusedPanel)) {
+        focusForMute = mLastFocusedPanel;
+    } else {
+        focusForMute = topVisible;
+    }
+
     ofPushStyle();
         if (mExpanded == false && mGuiFooter != nullptr){
             mGuiFooter->draw();
         }   else{
-            for (int i=0; i<items.size(); i++) items[i]->draw();
-            // color pickers overlap other components when expanded so they must be drawn last //
-            for (int i=0; i<items.size(); i++) items[i]->drawColorPicker();
+            // Apply muting recursively to everything except the topmost visible item.
+            std::vector<std::pair<ofxDatGuiComponent*, float>> muted;
+            std::function<void(ofxDatGuiComponent*)> muteTree;
+            muteTree = [&](ofxDatGuiComponent* c) {
+                if (!c || c == focusForMute) return;
+                muted.emplace_back(c, c->getOpacity());
+                c->applyMutedPalette(mOwnedTheme ? mOwnedTheme.get() : ofxDatGuiComponent::getTheme(), true);
+                c->forEachChild(muteTree);
+            };
+
+            if (mMuteUnfocusedPanels && focusForMute != nullptr) {
+                for (auto & item : items) {
+                    muteTree(item.get());
+                }
+            }
+
+            for (int i=0; i<items.size(); i++) {
+                items[i]->draw();
+                items[i]->drawColorPicker();
+            }
+
+            // Restore original opacities.
+            for (auto & pair : muted) {
+                pair.first->setOpacity(pair.second);
+                pair.first->applyMutedPalette(mOwnedTheme ? mOwnedTheme.get() : ofxDatGuiComponent::getTheme(), false);
+            }
         }
     ofPopStyle();
 }
