@@ -21,31 +21,21 @@
 - Curve Editor
 
 ## Roadmap (LoopyDev)
-- Positioning helpers for panels (reintroduce anchor-like conveniences per panel, optional)
+- Positioning helpers for panels (reintroduce anchor-like conveniences per panel, those should be anchor-able to other panels, optional)
 - Continued cleanup of manual layout defaults and API polish
 - More examples showcasing stack-owned panels + dynamic panels
 - Bring-to-front z-ordering for GUI-owned panels (drag headers to raise)
 - Panel drag bounds (prevent panels from being dragged outside the window)
+- Easy theme creation + style guidelines adhering to WCAG 2.1 Level AA standards
 
 ![ofxDatGui-LoopyDev](https://loopydev.co.uk/img/software/ofxDatGui-LoopyDev/gallery/1.webp "ofxDatGui-LoopyDev")  
-
-Temp:
-Restructuring horizontally stacked gui components. To add a horizontally stacked GUI panel:
-
-	gui = new ofxDatGui(); // anchors removed; manual layout by default
-	gui->setWidth(ofGetWidth());
-	auto * row = gui->addPanel(ofxDatGuiPanel::Orientation::HORIZONTAL);
-	row->attachItem(new ofxDatGuiButton("Play"));
-	row->attachItem(new ofxDatGuiButton("Pause"));
-	row->attachItem(new ofxDatGuiButton("Stop"));
-	row->attachItem(new ofxDatGuiButton("Okeyyeh"));
 
 ---
 
 ## Quick setup & panel patterns
 
-Anchors are deprecated; everything is manual layout. `ofxDatGui` defaults to `setAutoDraw(true)` so you usually don't need to call `draw()`/`update()` yourself unless you disable autodraw.
-
+Anchors are deprecated; everything is manual layout.
+AutoDraw is depreciated so you need to call draw() and update() manually on the 'root gui' and stack-owned panels which haven't been attached to the 'root gui'.
 ```cpp
 // ofApp.h
 ofxDatGui gui;                // gui-owned components live inside this
