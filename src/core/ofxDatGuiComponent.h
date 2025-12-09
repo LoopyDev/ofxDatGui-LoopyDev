@@ -75,6 +75,8 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         float getOpacity() const { return mStyle.opacity / 255.f; }
         void setIconColor(ofColor c) { mIcon.color = c; }
         void applyMutedPalette(const ofxDatGuiTheme* theme, bool muted);
+        void setPreventMuting(bool prevent) { mPreventMuting = prevent; }
+        bool getPreventMuting() const { return mPreventMuting; }
 
         void    setBorder(ofColor color, int width);
         void    setBorderVisible(bool visible);
@@ -130,6 +132,12 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         void onWindowResized(ofResizeEventArgs &e);
 
         static const ofxDatGuiTheme* getTheme();
+        static bool isApplyingThemeWidth();
+        class ThemeWidthScope {
+        public:
+            ThemeWidthScope();
+            ~ThemeWidthScope();
+        };
     
     protected:
     
@@ -149,6 +157,10 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         ofxDatGuiType mType;
         ofxDatGuiAnchor mAnchor;
         shared_ptr<ofxSmartFont> mFont;
+        bool mPreventMuting = false;
+        bool mUserWidthSet = false;
+        bool mHasAppliedWidth = false;
+        bool mUserStripeOverride = false;
     
         struct{
             float width;

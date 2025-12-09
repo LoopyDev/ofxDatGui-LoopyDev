@@ -5,6 +5,7 @@
 #include "../components/ofxDatGuiButton.h" // contains ofxDatGuiToggle too
 #include "../components/ofxDatGuiSlider.h"
 #include "../components/ofxDatGuiLabel.h"
+#include "../components/ofxDatGuiTextInput.h"
 #include <algorithm>
 
 class ofxDatGui; // forward declaration for getRoot/bringToFront
@@ -30,6 +31,8 @@ public:
 		, mHeaderHeight(24)
 		, mDragging(false) {
 		mType = ofxDatGuiType::PANEL;
+		// Panels allow muting by default; caller can opt out via setPreventMuting(true).
+		mPreventMuting = false;
 
 		// Initialize spacing & base style from the global default theme
 		// so layoutChildren() has sane values even before setTheme() is called.
@@ -99,12 +102,12 @@ public:
 	}
 
 	void setWidth(int width, float labelWidth = 1.f) override {
-		// Let base set our own width & internal style, but we do NOT want
-		// the default behaviour of forcing all children to this width,
-		// because we are going to lay them out ourselves.
-		//
-		// So: temporarily clear our children list, call base setWidth,
-		// then restore children and relayout.
+		// Respect user-defined widths: if a theme is being applied and the user
+		// already set a width, don't override it. Otherwise, update our own width
+		// and relayout children without forcing their widths directly.
+		const bool themeWidth = ofxDatGuiComponent::isApplyingThemeWidth();
+		if (themeWidth && mUserWidthSet) return;
+
 		mStyle.width = width;
 		if (labelWidth > 1) {
 			mLabel.width = labelWidth;
@@ -114,6 +117,12 @@ public:
 		mIcon.x = mStyle.width - (mStyle.width * .05) - mIcon.size;
 		mLabel.rightAlignedXpos = mLabel.width - mLabel.margin;
 		positionLabel();
+
+		mHasAppliedWidth = true;
+		if (!themeWidth) {
+			mUserWidthSet = true;
+		}
+
 		layoutChildren();
 	}
 
@@ -255,6 +264,7 @@ public:
 		// Store root in local variable to avoid incomplete type issues
 		ofxDatGui* root = getRoot();
 		item->setRoot(root);
+		item->setStripeColor(mStyle.stripe.color);
 
 		// Make new kids follow the panel's current stripe orientation
 		if (mOrientation == Orientation::HORIZONTAL) {
@@ -293,6 +303,25 @@ public:
 		return attachOwned(std::move(item));
 	}
 
+	// Parameter-bound sliders for two-way syncing with ofParameter.
+	ofxDatGuiSlider* addSlider(ofParameter<int> & p) {
+		auto item = std::make_unique<ofxDatGuiSlider>(p);
+		item->setStripeColor(mStyle.stripe.color);
+		return attachOwned(std::move(item));
+	}
+
+	ofxDatGuiSlider* addSlider(ofParameter<float> & p) {
+		auto item = std::make_unique<ofxDatGuiSlider>(p);
+		item->setStripeColor(mStyle.stripe.color);
+		return attachOwned(std::move(item));
+	}
+
+	ofxDatGuiTextInput* addTextInput(const std::string & label, const std::string & value = "") {
+		auto item = std::make_unique<ofxDatGuiTextInput>(label, value);
+		item->setStripeColor(mStyle.stripe.color);
+		return attachOwned(std::move(item));
+	}
+
 	ofxDatGuiDropdown* addDropdown(const std::string & label, const std::vector<std::string> & options);
 
 	ofxDatGuiLabel* addLabel(const std::string & label) {
@@ -316,13 +345,25 @@ protected:
 
 		int cursorY = y + (mHeaderEnabled ? mHeaderHeight : 0);
 
+		// Preserve each child's existing label/share ratio so components like sliders
+		// don't end up with the label consuming the full row width.
+		auto labelFrac = [](ofxDatGuiComponent* c) {
+			// mLabel.width is stored in pixels; convert back to a fraction of the current width.
+			const float w = static_cast<float>(c->getWidth());
+			if (w <= 0.f) return 0.35f;
+			float frac = c->getLabelWidth() / w;
+			if (frac <= 0.f) frac = 0.35f;
+			if (frac > 0.95f) frac = 0.95f; // always leave some room for the control itself
+			return frac;
+		};
+
 		if (mOrientation == Orientation::VERTICAL) {
 			const int spacing = mSpacing;
 
 			for (auto & c : children) {
 				if (!c->getVisible()) continue;
-				// Force children to match panel width in vertical mode.
-				c->setWidth(mStyle.width, 1.f);
+				// Force children to match panel width in vertical mode, but keep their label ratio.
+				c->setWidth(mStyle.width, labelFrac(c.get()));
 				c->setPosition(x, cursorY);
 				cursorY += c->getHeight() + spacing;
 			}
@@ -380,7 +421,7 @@ protected:
 				int thisWidth = childWidth + (leftover > 0 ? 1 : 0);
 				if (leftover > 0) --leftover;
 				// Give each child the computed width.
-				c->setWidth(thisWidth, 1.f); // labelWidth not important here
+				c->setWidth(thisWidth, labelFrac(c)); // keep existing label ratio when resizing
 				c->setPosition(cursorX, y + (mHeaderEnabled ? mHeaderHeight : 0));
 
 				cursorX += thisWidth;

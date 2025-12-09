@@ -38,6 +38,7 @@ class ofxDatGuiThemeSmoke : public ofxDatGuiTheme{
             color.guiBackground = hex(0x2C3137);
             color.background = hex(0x343B41);
             color.slider.fill = hex(0x60B9ED);
+            color.slider.hover = color.slider.fill;
             color.slider.text = hex(0xFFFFFF);
             color.inputAreaBackground = hex(0x434A50);
             color.textInput.text = hex(0xFFFFFF);
@@ -64,6 +65,7 @@ class ofxDatGuiThemeWireframe : public ofxDatGuiTheme{
             color.guiBackground = hex(0xD8D8DB);
             color.inputAreaBackground = hex(0xE9E9E9);
             color.slider.fill = hex(0x6E6E6E);
+            color.slider.hover = color.slider.fill;
             color.slider.text = hex(0x6E6E6E);
             color.textInput.text = hex(0x6E6E6E);
             color.textInput.highlight = hex(0xFCFAFD);
@@ -93,6 +95,7 @@ class ofxDatGuiThemeMidnight : public ofxDatGuiTheme{
             color.guiBackground = hex(0x4C5B66);
             color.inputAreaBackground = hex(0x273946);
             color.slider.fill = hex(0x0A1E2E);
+            color.slider.hover = color.slider.fill;
             color.slider.text = hex(0xffffff);
             color.textInput.text = hex(0xffffff);
             color.textInput.highlight = hex(0x596872);
@@ -118,6 +121,7 @@ class ofxDatGuiThemeAqua : public ofxDatGuiTheme{
             color.background = hex(0x445966);
             color.inputAreaBackground = hex(0x61717D);
             color.slider.fill = hex(0xF8F3F0);
+            color.slider.hover = color.slider.fill;
             color.slider.text = hex(0xFFFFFF);
             color.textInput.text = hex(0xFFFFFF);
             color.textInput.highlight = hex(0x445966);
@@ -143,6 +147,7 @@ class ofxDatGuiThemeCharcoal : public ofxDatGuiTheme{
             color.guiBackground = hex(0x1E1F24);
             color.inputAreaBackground = hex(0x42424A);
             color.slider.fill = hex(0xF4BF39);
+            color.slider.hover = color.slider.fill;
             color.slider.text = hex(0x9C9DA1);
             color.textInput.text = hex(0x9C9DA1);
             color.textInput.highlight = hex(0x28292E);
@@ -168,6 +173,7 @@ class ofxDatGuiThemeAutumn : public ofxDatGuiTheme{
             color.background = hex(0x4C4743);
             color.inputAreaBackground = hex(0xB5BCB2);
             color.slider.fill = hex(0xFFB230);
+            color.slider.hover = color.slider.fill;
             color.slider.text = hex(0xF8F3F0);
             color.textInput.text = hex(0xF8F3F0);
             color.textInput.highlight = hex(0x4C4743);
@@ -193,6 +199,7 @@ class ofxDatGuiThemeCandy : public ofxDatGuiTheme{
             color.guiBackground = hex(0xEEEEEE);
             color.inputAreaBackground = hex(0xFF80AB);
             color.slider.fill = hex(0xF50057);
+            color.slider.hover = color.slider.fill;
             color.slider.text = hex(0xFFFFFF);
             color.textInput.text = hex(0xFFFFFF);
             color.textInput.highlight = hex(0xFF4081);
@@ -207,6 +214,42 @@ class ofxDatGuiThemeCandy : public ofxDatGuiTheme{
             color.pad2d.line = hex(0xFFFFFF);
             color.pad2d.ball = hex(0xFFFFFF);
             color.graph.fills = hex(0xF50057);
+            init();
+        }
+};
+
+class ofxDatGuiThemeRetroGreen : public ofxDatGuiTheme{
+
+    public:
+
+        ofxDatGuiThemeRetroGreen()
+        {
+            color.label = hex(0x9BF87F);
+            color.icons = hex(0x9BF87F);
+            color.guiBackground = hex(0x050A05);
+            color.background = hex(0x0A120A);
+            color.inputAreaBackground = hex(0x0F1E0F);
+            color.slider.fill = hex(0x74FF4C);
+            color.slider.hover = hex(0x9BF87F); // brighter on hover/drag
+            color.slider.text = hex(0x9BF87F); // keep value visible when unfocused
+            color.textInput.text = hex(0x9BF87F);
+            color.textInput.highlight = hex(0x163316);
+            color.textInput.backgroundOnActive = hex(0x081608);
+            color.backgroundOnMouseOver = hex(0x122512);
+            color.backgroundOnMouseDown = hex(0x0B190B);
+            color.matrix.normal.button = hex(0x0D1A0D);
+            color.matrix.normal.label = hex(0x74FF4C);
+            color.matrix.hover.button = hex(0x193519);
+            color.matrix.selected.button = hex(0x74FF4C);
+            color.pad2d.line = hex(0x74FF4C);
+            color.pad2d.ball = hex(0x9BF87F);
+            color.graph.fills = hex(0x3CC13A);
+            color.colorPicker.border = hex(0x1E2E1E);
+            stripe.button = hex(0x74FF4C);
+            stripe.toggle = hex(0x74FF4C);
+            stripe.slider = hex(0x9BF87F);
+            stripe.dropdown = hex(0x3CC13A);
+            stripe.textInput = hex(0x74FF4C);
             init();
         }
 };

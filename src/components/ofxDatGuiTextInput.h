@@ -81,6 +81,15 @@ class ofxDatGuiTextInput : public ofxDatGuiComponent {
         {
             mInput.setTextInputFieldType(type);
         }
+
+        void update(bool acceptEvents = true)
+        {
+            if (!acceptEvents && (mFocused || mInput.hasFocus())) {
+                // Drop focus when another component owns interaction to avoid stuck key listeners.
+                onFocusLost();
+            }
+            ofxDatGuiComponent::update(acceptEvents);
+        }
     
         void draw()
         {
@@ -119,6 +128,22 @@ class ofxDatGuiTextInput : public ofxDatGuiComponent {
         {
             mInput.onFocusLost();
             ofxDatGuiComponent::onFocusLost();
+        }
+
+        void onMousePress(ofPoint m)
+        {
+            if (!mInput.hitTest(m) && mInput.hasFocus()) {
+                onFocusLost();
+            }
+            ofxDatGuiComponent::onMousePress(m);
+        }
+
+        void onMouseRelease(ofPoint m)
+        {
+            ofxDatGuiComponent::onMouseRelease(m);
+            if (mInput.hitTest(m) == false) {
+                onFocusLost();
+            }
         }
     
         void onKeyPressed(int key)

@@ -34,11 +34,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 {
     
     public:
-        struct ComponentDeleter {
-            bool owning = true;
-            void operator()(ofxDatGuiComponent* p) const { if (owning) delete p; }
-        };
-        using ComponentPtr = std::unique_ptr<ofxDatGuiComponent, ComponentDeleter>;
+        using ComponentPtr = std::unique_ptr<ofxDatGuiComponent>;
         enum class Orientation {
             VERTICAL,
             HORIZONTAL
@@ -136,16 +132,11 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
             return raw;
         };
 		// --- LoopyDev: add horizontal button bar ---
-		ofxDatGuiButtonBar * addButtonBar(const std::string & label,
+        ofxDatGuiButtonBar * addButtonBar(const std::string & label,
 			const std::vector<std::string> & buttons);
 		// LoopyDev: add panel
 		ofxDatGuiPanel * addPanel(ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
         ofxDatGuiPanel& createPanel(const std::string& label = "", ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
-        // attachPanel: by default preserves the panel's existing orientation.
-        // Pass overrideOrientation=true to force a new orientation.
-        ofxDatGuiPanel& attachPanel(ofxDatGuiPanel& panel, const std::string& label = "",
-            ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL,
-            bool overrideOrientation = false);
 
         ofxDatGuiHeader* getHeader();
         ofxDatGuiFooter* getFooter();
@@ -185,6 +176,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool mBringToFrontOnInteract = false;
         bool mMuteUnfocusedPanels = false;
         bool mActiveOnHover = false;
+        bool mUserWidthSet = false;
         ofxDatGuiComponent* mLastFocusedPanel = nullptr;
         ofxDatGuiComponent* mMouseCaptureOwner = nullptr;
         bool mAlphaChanged;
@@ -202,6 +194,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         ofxDatGuiFooter* mGuiFooter;
         std::unique_ptr<ofxDatGuiTheme> mOwnedTheme;
         std::unique_ptr<ofxDatGuiTheme> mPendingOwnedTheme;
+        const ofxDatGuiTheme* mBorrowedTheme = nullptr;
         ofxDatGuiTheme* mPendingBorrowedTheme = nullptr;
         ofxDatGuiAlignment mAlignment;
         std::vector<ComponentPtr> items;
@@ -218,11 +211,13 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool hitTest(ofPoint pt);
         void attachItem(ComponentPtr item, bool applyTheme = true);
         void bringItemToFront(ofxDatGuiComponent* component);
+        const ofxDatGuiTheme* getActiveTheme() const;
+        void setWidthInternal(int width, float labelWidth, bool markUser);
+        void applyThemeWidth(int width, float labelWidth);
         template<typename T, typename... Args>
-        std::unique_ptr<T, ComponentDeleter> makeOwned(Args&&... args) {
-            return std::unique_ptr<T, ComponentDeleter>(new T(std::forward<Args>(args)...), ComponentDeleter{true});
+        std::unique_ptr<T> makeOwned(Args&&... args) {
+            return std::make_unique<T>(std::forward<Args>(args)...);
         }
-        ComponentPtr makeBorrowed(ofxDatGuiComponent& ref);
         void applyThemeRecursive(ofxDatGuiComponent* node, const ofxDatGuiTheme* t);
     
         void onDraw(ofEventArgs &e);

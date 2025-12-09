@@ -59,26 +59,43 @@ void ofApp::setup() {
     gui.setPosition(40, 40);
     gui.setWidth(320);
 
-    // 1) Dynamic/gui-owned panel (lifetime tied to gui)
-    auto& dyn = gui.createPanel("Dynamic Panel", ofxDatGuiPanel::Orientation::VERTICAL);
-    dyn.setHeaderEnabled(true);
-    dyn.setPosition(40, 40);         // always position panels manually
-    dyn.addButton("Hello");
-    dyn.addToggle("World", false);
-
-    // 2) Stack-owned panel you attach to the gui
-    stackPanel.setHeaderEnabled(true);
-    stackPanel.addButton("External A");
-    stackPanel.addButton("External B");
-
-    // Attach hands theme/width/ownership to the gui while you keep the object alive.
-    gui.attachPanel(stackPanel, "Attached Panel", ofxDatGuiPanel::Orientation::HORIZONTAL);
-    stackPanel.setPosition(40, 200);
-    stackPanel.setWidth(480, 0.35f);
+    auto& panel = gui.createPanel("Main Panel", ofxDatGuiPanel::Orientation::VERTICAL);
+    panel.setHeaderEnabled(true);
+    panel.setPosition(40, 40);         // always position panels manually
+    panel.addButton("Hello");
+    panel.addToggle("World", false);
 }
 ```
 
 - `createPanel(...)`/`addPanel(...)`: gui creates & owns the panel; destroyed with `gui`. Width/theme are inherited automatically.
-- `attachPanel(panel, ...)`: plug in a stack-owned panel; caller keeps it alive. `attachPanel` will set the label/theme and respect any width you already set (it only applies the gui width if the panel had none). Pass `overrideOrientation=true` if you want the gui call to change orientation; otherwise the panel keeps whatever orientation you set beforehand.
-- If you keep a stack-owned panel *detached* (not attached to a gui), set its theme yourself (`panel.setTheme(ofxDatGuiComponent::getTheme())`), and call `panel.update()` / `panel.draw()` manually.
 - Optional z-order: `gui.setBringToFrontOnInteract(true)` raises the most recently interacted top-level item in draw order without changing manual positions.
+- Muting: `gui.setMuteUnfocusedPanels(true)` applies muted theme colors to non-focused panels. Per-panel opt-out: `panel.setPreventMuting(true)` (muting is allowed by default).
+
+## Binding callbacks
+Two equivalent styles are available:
+
+- Direct callbacks (lambda or `std::function`): `button->onButtonEvent([](ofxDatGuiButtonEvent e){ ofLog() << e.target->getLabel(); });`
+- ofxGui-style listeners: `button->addButtonListener(this, &ofApp::onButtonPressed);` (and `removeButtonListener(...)` to clear). Toggles also support `addToggleListener/removeToggleListener`.
+
+Example:
+```cpp
+// Lambdas
+button->onButtonEvent([](ofxDatGuiButtonEvent e){
+    ofLog() << "Clicked: " << e.target->getLabel();
+});
+
+// ofxGui-style listeners
+button->addButtonListener(this, &ofApp::onButtonPressed);
+toggle->addToggleListener(this, &ofApp::onToggleChanged);
+
+void ofApp::onButtonPressed(ofxDatGuiButtonEvent e) {
+    ofLogNotice() << "Pressed " << e.target->getLabel();
+}
+
+void ofApp::onToggleChanged(ofxDatGuiToggleEvent e) {
+    ofLogNotice() << "Toggle is now " << e.checked;
+}
+
+// You can also bind a no-arg member function for buttons:
+button->addButtonListener(this, &ofApp::onPressedWithoutArgs);
+```

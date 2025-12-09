@@ -26,6 +26,24 @@
 bool ofxDatGuiLog::mQuiet = false;
 string ofxDatGuiTheme::AssetPath = "";
 std::unique_ptr<ofxDatGuiTheme> ofxDatGuiComponent::theme;
+namespace {
+    int gThemeWidthDepth = 0;
+}
+
+bool ofxDatGuiComponent::isApplyingThemeWidth()
+{
+    return gThemeWidthDepth > 0;
+}
+
+ofxDatGuiComponent::ThemeWidthScope::ThemeWidthScope()
+{
+    ++gThemeWidthDepth;
+}
+
+ofxDatGuiComponent::ThemeWidthScope::~ThemeWidthScope()
+{
+    --gThemeWidthDepth;
+}
 
 ofxDatGuiComponent::ofxDatGuiComponent(string label)
 {
@@ -104,9 +122,12 @@ void ofxDatGuiComponent::setComponentStyle(const ofxDatGuiTheme* theme)
     mStyle.color.inputArea = theme->color.inputAreaBackground;
     mStyle.color.onMouseOver = theme->color.backgroundOnMouseOver;
     mStyle.color.onMouseDown = theme->color.backgroundOnMouseDown;
-    mStyle.stripe.width = theme->stripe.width;
-    mStyle.stripe.visible = theme->stripe.visible;
-	mStyle.stripe.position = StripePosition::LEFT; // preserve original behaviour
+    if (!mUserStripeOverride) {
+        mStyle.stripe.width = theme->stripe.width;
+        mStyle.stripe.visible = theme->stripe.visible;
+        mStyle.stripe.color = theme->stripe.label;
+	    mStyle.stripe.position = StripePosition::LEFT; // preserve original behaviour
+    }
     mStyle.border.width = theme->border.width;
     mStyle.border.color = theme->border.color;
     mStyle.border.visible = theme->border.visible;
@@ -119,12 +140,19 @@ void ofxDatGuiComponent::setComponentStyle(const ofxDatGuiTheme* theme)
     mLabel.margin = theme->layout.labelMargin;
     mLabel.forceUpperCase = theme->layout.upperCaseLabels;
     setLabel(mLabel.text);
-    setWidth(theme->layout.width, theme->layout.labelWidth);
+    {
+        ThemeWidthScope scope;
+        setWidth(theme->layout.width, theme->layout.labelWidth);
+    }
     forEachChild([&](ofxDatGuiComponent* c){ c->setTheme(theme); });
 }
 
 void ofxDatGuiComponent::setWidth(int width, float labelWidth)
 {
+    const bool themeWidth = isApplyingThemeWidth();
+    if (themeWidth && mUserWidthSet) {
+        return;
+    }
     mStyle.width = width;
     if (labelWidth > 1){
 // we received a pixel value //
@@ -137,6 +165,10 @@ void ofxDatGuiComponent::setWidth(int width, float labelWidth)
     mLabel.rightAlignedXpos = mLabel.width - mLabel.margin;
     forEachChild([&](ofxDatGuiComponent* c){ c->setWidth(width, labelWidth); });
     positionLabel();
+    if (!themeWidth && mHasAppliedWidth) {
+        mUserWidthSet = true;
+    }
+    mHasAppliedWidth = true;
 }
 
 int ofxDatGuiComponent::getWidth()
@@ -341,26 +373,32 @@ void ofxDatGuiComponent::setStripe(ofColor color, int width)
 {
     mStyle.stripe.color = color;
     mStyle.stripe.width = width;
+    mStyle.stripe.visible = true;
+    mUserStripeOverride = true;
 }
 
 void ofxDatGuiComponent::setStripeColor(ofColor color)
 {
     mStyle.stripe.color = color;
+    mUserStripeOverride = true;
 }
 
 void ofxDatGuiComponent::setStripeWidth(int width)
 {
     mStyle.stripe.width = width;
+    mUserStripeOverride = true;
 }
 
 void ofxDatGuiComponent::setStripeVisible(bool visible)
 {
     mStyle.stripe.visible = visible;
+    mUserStripeOverride = true;
 }
 
 // LoopyDev: Stripe config
 void ofxDatGuiComponent::setStripePosition(StripePosition position) {
 	mStyle.stripe.position = position;
+    mUserStripeOverride = true;
 }
 
 ofxDatGuiComponent::StripePosition ofxDatGuiComponent::getStripePosition() const {
@@ -382,18 +420,20 @@ void ofxDatGuiComponent::applyMutedPalette(const ofxDatGuiTheme* theme, bool mut
 	setLabelColor(label);
 	setIconColor(icon);
 
-	// Stripe mapping by component type.
-	switch (getType()) {
-	case ofxDatGuiType::LABEL:      setStripeColor(muted ? theme->stripe.muted.label : theme->stripe.label); break;
-	case ofxDatGuiType::BUTTON:     setStripeColor(muted ? theme->stripe.muted.button : theme->stripe.button); break;
-	case ofxDatGuiType::TOGGLE:     setStripeColor(muted ? theme->stripe.muted.toggle : theme->stripe.toggle); break;
-	case ofxDatGuiType::SLIDER:     setStripeColor(muted ? theme->stripe.muted.slider : theme->stripe.slider); break;
-	case ofxDatGuiType::PAD2D:      setStripeColor(muted ? theme->stripe.muted.pad2d : theme->stripe.pad2d); break;
-	case ofxDatGuiType::MATRIX:     setStripeColor(muted ? theme->stripe.muted.matrix : theme->stripe.matrix); break;
-	case ofxDatGuiType::DROPDOWN:   setStripeColor(muted ? theme->stripe.muted.dropdown : theme->stripe.dropdown); break;
-	case ofxDatGuiType::TEXT_INPUT: setStripeColor(muted ? theme->stripe.muted.textInput : theme->stripe.textInput); break;
-	case ofxDatGuiType::COLOR_PICKER: setStripeColor(muted ? theme->stripe.muted.colorPicker : theme->stripe.colorPicker); break;
-	default:                        setStripeColor(muted ? theme->stripe.muted.label : theme->stripe.label); break;
+	// Stripe mapping by component type; respect user stripe overrides.
+	if (!mUserStripeOverride) {
+		switch (getType()) {
+		case ofxDatGuiType::LABEL:      setStripeColor(muted ? theme->stripe.muted.label : theme->stripe.label); break;
+		case ofxDatGuiType::BUTTON:     setStripeColor(muted ? theme->stripe.muted.button : theme->stripe.button); break;
+		case ofxDatGuiType::TOGGLE:     setStripeColor(muted ? theme->stripe.muted.toggle : theme->stripe.toggle); break;
+		case ofxDatGuiType::SLIDER:     setStripeColor(muted ? theme->stripe.muted.slider : theme->stripe.slider); break;
+		case ofxDatGuiType::PAD2D:      setStripeColor(muted ? theme->stripe.muted.pad2d : theme->stripe.pad2d); break;
+		case ofxDatGuiType::MATRIX:     setStripeColor(muted ? theme->stripe.muted.matrix : theme->stripe.matrix); break;
+		case ofxDatGuiType::DROPDOWN:   setStripeColor(muted ? theme->stripe.muted.dropdown : theme->stripe.dropdown); break;
+		case ofxDatGuiType::TEXT_INPUT: setStripeColor(muted ? theme->stripe.muted.textInput : theme->stripe.textInput); break;
+		case ofxDatGuiType::COLOR_PICKER: setStripeColor(muted ? theme->stripe.muted.colorPicker : theme->stripe.colorPicker); break;
+		default:                        setStripeColor(muted ? theme->stripe.muted.label : theme->stripe.label); break;
+		}
 	}
 }
 

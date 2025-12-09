@@ -23,6 +23,7 @@
 #pragma once
 #include "ofxDatGuiComponent.h"
 #include "ofxDatGuiTextInputField.h"
+#include <cmath>
 
 class ofxDatGuiSlider : public ofxDatGuiComponent {
 
@@ -64,6 +65,7 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
         {
             setComponentStyle(theme);
             mSliderFill = theme->color.slider.fill;
+            mSliderHoverFill = theme->color.slider.hover;
             mBackgroundFill = theme->color.inputAreaBackground;
             mStyle.stripe.color = theme->stripe.slider;
             mInput->setTheme(theme);
@@ -92,6 +94,15 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
         {
             mPrecision = precision;
             if (mPrecision > MAX_PRECISION) mPrecision = MAX_PRECISION;
+            // Use precision to derive a snap increment (e.g. precision 1 -> snap 0.1).
+            // Call setSnapIncrement(0) if you want to disable snapping.
+            mSnapIncrement = pow(10.f, -static_cast<float>(mPrecision));
+        }
+
+        // Optional explicit snap increment; set to 0 to disable snapping.
+        void setSnapIncrement(float increment)
+        {
+            mSnapIncrement = increment;
         }
     
         void setMin(float min)
@@ -116,6 +127,10 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
     
         void setValue(float value, bool dispatchEvent = true)
         {
+            // Snap to increment if configured (defaults to precision-based step).
+            if (mSnapIncrement > 0) {
+                value = mMin + std::round((value - mMin) / mSnapIncrement) * mSnapIncrement;
+            }
             value = round(value, mPrecision);
             if (value != mValue){
                 mValue = value;
@@ -196,16 +211,17 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
         {
             if (!mVisible) return;
             ofPushStyle();
-                ofxDatGuiComponent::draw();
-            // slider bkgd //
+            ofxDatGuiComponent::draw();
+        // slider bkgd //
                 ofSetColor(mBackgroundFill);
                 ofDrawRectangle(x+mLabel.width, y+mStyle.padding, mSliderWidth, mStyle.height-(mStyle.padding*2));
-            // slider fill //
+        // slider fill //
                 if (mScale > 0){
-                    ofSetColor(mSliderFill);
+                    // Highlight the fill when hovered for better affordance.
+                    ofSetColor((mMouseOver && mEnabled) ? mSliderHoverFill : mSliderFill);
                     ofDrawRectangle(x+mLabel.width, y+mStyle.padding, mSliderWidth*mScale, mStyle.height-(mStyle.padding*2));
                 }
-            // numeric input field //
+        // numeric input field //
                 mInput->draw();
             ofPopStyle();
         }
@@ -309,8 +325,10 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
         int     mInputWidth;
         int     mSliderWidth;
         ofColor mSliderFill;
+        ofColor mSliderHoverFill;
         ofColor mBackgroundFill;
         ofxDatGuiTextInputField* mInput;
+        float   mSnapIncrement = 0;
     
         static const int MAX_PRECISION = 4;
     

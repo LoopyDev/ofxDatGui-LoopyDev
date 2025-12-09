@@ -70,6 +70,7 @@ void ofxDatGui::init()
     mAlpha = 1.0f;
     const ofxDatGuiTheme* defaultTheme = ofxDatGuiComponent::getTheme();
     mWidth = defaultTheme->layout.width;
+    mLabelWidth = defaultTheme->layout.labelWidth;
     mRowSpacing = defaultTheme->layout.vMargin;
     mGuiBackground = defaultTheme->color.guiBackground;
 
@@ -183,10 +184,26 @@ bool ofxDatGui::getFocused()
 void ofxDatGui::setWidth(int width, float labelWidth)
 {
     ensureSetup();
+    setWidthInternal(width, labelWidth, true);
+}
+
+void ofxDatGui::setWidthInternal(int width, float labelWidth, bool markUser)
+{
     mWidth = width;
     mLabelWidth = labelWidth;
     mWidthChanged = true;
+    if (markUser) {
+        mUserWidthSet = true;
+    }
     if (mAnchor != ofxDatGuiAnchor::NO_ANCHOR) positionGui();
+}
+
+void ofxDatGui::applyThemeWidth(int width, float labelWidth)
+{
+    (void)width;
+    // Keep theme from overriding caller-defined widths; only refresh stored label width.
+    if (mUserWidthSet) return;
+    mLabelWidth = labelWidth;
 }
 
 void ofxDatGui::setOrientation(Orientation orientation) {
@@ -215,12 +232,15 @@ void ofxDatGui::setTheme(ofxDatGuiTheme* t, bool applyImmediately)
         if (t) {
             mRowSpacing = t->layout.vMargin;
             mGuiBackground = t->color.guiBackground;
-            setWidth(t->layout.width, t->layout.labelWidth);
+            applyThemeWidth(t->layout.width, t->layout.labelWidth);
+            ofxDatGuiComponent::ThemeWidthScope scope;
             for (auto & item : items) applyThemeRecursive(item.get(), t);
+            layoutGui();
         }
         // Borrowed theme, do not take ownership.
         mPendingBorrowedTheme = nullptr;
         mPendingOwnedTheme.reset();
+        mBorrowedTheme = mOwnedTheme ? nullptr : t;
         mThemeChanged = false;
     }   else{
         // apply on next update call //
@@ -355,12 +375,20 @@ string ofxDatGui::getAssetPath()
     return ofxDatGuiTheme::AssetPath;
 }
 
+const ofxDatGuiTheme* ofxDatGui::getActiveTheme() const
+{
+    if (mOwnedTheme) return mOwnedTheme.get();
+    if (mBorrowedTheme) return mBorrowedTheme;
+    return ofxDatGuiComponent::getTheme();
+}
+
 void ofxDatGui::relayout() {
 	layoutGui();
 }
 
 void ofxDatGui::applyThemeRecursive(ofxDatGuiComponent* node, const ofxDatGuiTheme* t) {
 	if (!node || !t) return;
+    ofxDatGuiComponent::ThemeWidthScope scope;
 	node->setTheme(t);
 	node->forEachChild([&](ofxDatGuiComponent* c) {
 		applyThemeRecursive(c, t);
@@ -580,7 +608,7 @@ ofxDatGuiFolder* ofxDatGui::addFolder(string label, ofColor color)
 ofxDatGuiFolder* ofxDatGui::addFolder(ofxDatGuiFolder* folder)
 {
     if (!folder) return nullptr;
-    ComponentPtr ptr(folder, ComponentDeleter{true});
+    ComponentPtr ptr(folder);
     auto* raw = folder;
     attachItem(std::move(ptr));
     return raw;
@@ -599,60 +627,15 @@ ofxDatGuiPanel& ofxDatGui::createPanel(const std::string& label, ofxDatGuiPanel:
     auto * raw = static_cast<ofxDatGuiPanel*>(panel.get());
     if (!label.empty()) raw->setLabel(label);
 
-    const ofxDatGuiTheme* themeToUse = mOwnedTheme ? mOwnedTheme.get() : ofxDatGuiComponent::getTheme();
-    raw->setTheme(themeToUse);
+    const ofxDatGuiTheme* themeToUse = getActiveTheme();
+    {
+        ofxDatGuiComponent::ThemeWidthScope scope;
+        raw->setTheme(themeToUse);
+    }
     raw->setWidth(mWidth, mLabelWidth);
     attachItem(std::move(panel));
     return *raw;
 }
-
-ofxDatGuiPanel& ofxDatGui::attachPanel(ofxDatGuiPanel& panel, const std::string& label,
-    ofxDatGuiPanel::Orientation orientation, bool overrideOrientation) {
-    ensureSetup();
-    const int prevWidth = panel.getWidth();
-    const float prevLabelWidth = panel.getLabelWidth();
-    // Snapshot stripe state for panel and all descendants to restore after theme.
-    struct StripeState {
-        ofxDatGuiComponent* c;
-        ofColor color;
-        int width;
-        bool visible;
-        ofxDatGuiComponent::StripePosition pos;
-    };
-    std::vector<StripeState> stripeStates;
-    std::function<void(ofxDatGuiComponent*)> snapshot = [&](ofxDatGuiComponent* c) {
-        if (!c) return;
-        stripeStates.push_back(StripeState{ c, c->getStripeColor(), c->getStripeWidth(), c->getStripeVisible(), c->getStripePosition() });
-        c->forEachChild(snapshot);
-    };
-    snapshot(&panel);
-
-    if (overrideOrientation) {
-        panel.setOrientation(orientation);
-    }
-    if (!label.empty()) panel.setLabel(label);
-    const ofxDatGuiTheme* themeToUse = mOwnedTheme ? mOwnedTheme.get() : ofxDatGuiComponent::getTheme();
-    panel.setTheme(themeToUse);
-
-    // Restore caller-set stripe properties recursively.
-    for (auto & st : stripeStates) {
-        st.c->setStripeColor(st.color);
-        st.c->setStripeWidth(st.width);
-        st.c->setStripeVisible(st.visible);
-        st.c->setStripePosition(st.pos);
-    }
-
-    // Respect caller-set width if present; otherwise adopt GUI width.
-    if (prevWidth > 0) {
-        panel.setWidth(prevWidth, prevLabelWidth);
-    } else {
-        panel.setWidth(mWidth, mLabelWidth);
-    }
-    ComponentPtr ptr = makeBorrowed(panel);
-    attachItem(std::move(ptr), false); // theme already applied above
-    return panel;
-}
-
 
 
 void ofxDatGui::attachItem(ComponentPtr item, bool applyTheme)
@@ -663,10 +646,12 @@ void ofxDatGui::attachItem(ComponentPtr item, bool applyTheme)
     auto * raw = item.get();
     if (applyTheme) {
         // Apply current theme to the new item (owned, pending-owned, or default).
-        const ofxDatGuiTheme* themeToUse = mOwnedTheme ? mOwnedTheme.get()
-            : (mPendingOwnedTheme ? mPendingOwnedTheme.get()
-                : (mPendingBorrowedTheme ? mPendingBorrowedTheme : ofxDatGuiComponent::getTheme()));
-        if (themeToUse) raw->setTheme(themeToUse);
+        const ofxDatGuiTheme* themeToUse = mPendingOwnedTheme ? mPendingOwnedTheme.get()
+            : (mPendingBorrowedTheme ? mPendingBorrowedTheme : getActiveTheme());
+        if (themeToUse) {
+            ofxDatGuiComponent::ThemeWidthScope scope;
+            raw->setTheme(themeToUse);
+        }
     }
     if (mGuiFooter != nullptr){
         items.insert(items.end()-1, std::move(item));
@@ -725,12 +710,6 @@ void ofxDatGui::bringItemToFront(ofxDatGuiComponent* component) {
         layoutGui();
     }
 }
-
-ofxDatGui::ComponentPtr ofxDatGui::makeBorrowed(ofxDatGuiComponent& ref)
-{
-    return ComponentPtr(&ref, ComponentDeleter{false});
-}
-
 
 /*
     component retrieval methods
@@ -1171,6 +1150,15 @@ void ofxDatGui::layoutGui() {
 		const int spacing = mRowSpacing;
 		const int count = static_cast<int>(visible.size());
 
+		// Derive a safe label fraction from the stored label width so we don't
+		// hand children a label that eats their entire width when the row is crowded.
+		float labelFrac = mLabelWidth;
+		if (labelFrac > 1.f && mWidth > 0) {
+			labelFrac = mLabelWidth / static_cast<float>(mWidth);
+		}
+		if (labelFrac <= 0.f) labelFrac = 0.35f;
+		if (labelFrac > 0.95f) labelFrac = 0.95f;
+
 		const int totalSpacing = spacing * std::max(0, count - 1);
 		int childWidth = (availableWidth - totalSpacing) / std::max(1, count);
 		if (childWidth < 1) childWidth = 1;
@@ -1178,7 +1166,7 @@ void ofxDatGui::layoutGui() {
 		int rowHeight = 0;
 		for (auto * c : visible) {
 			// Give each child an equal share of the width.
-			c->setWidth(childWidth, mLabelWidth);
+			c->setWidth(childWidth, labelFrac);
 			rowHeight = std::max(rowHeight, c->getHeight());
 		}
 
@@ -1321,12 +1309,17 @@ void ofxDatGui::update()
             if (pending) {
                 mRowSpacing = pending->layout.vMargin;
                 mGuiBackground = pending->color.guiBackground;
-                setWidth(pending->layout.width, pending->layout.labelWidth);
+                applyThemeWidth(pending->layout.width, pending->layout.labelWidth);
+                ofxDatGuiComponent::ThemeWidthScope scope;
                 for (auto & item : items) applyThemeRecursive(item.get(), pending);
                 // Promote owned pending to active owned theme
                 if (mPendingOwnedTheme) {
                     mOwnedTheme = std::move(mPendingOwnedTheme);
+                    mBorrowedTheme = nullptr;
+                } else {
+                    mBorrowedTheme = mPendingBorrowedTheme ? mPendingBorrowedTheme : mBorrowedTheme;
                 }
+                layoutGui();
             }
             mPendingBorrowedTheme = nullptr;
             mThemeChanged = false;
@@ -1450,8 +1443,9 @@ void ofxDatGui::draw()
             std::function<void(ofxDatGuiComponent*)> muteTree;
             muteTree = [&](ofxDatGuiComponent* c) {
                 if (!c || c == focusForMute) return;
+                if (c->getPreventMuting()) return;
                 muted.emplace_back(c, c->getOpacity());
-                c->applyMutedPalette(mOwnedTheme ? mOwnedTheme.get() : ofxDatGuiComponent::getTheme(), true);
+                c->applyMutedPalette(getActiveTheme(), true);
                 c->forEachChild(muteTree);
             };
 
@@ -1469,7 +1463,7 @@ void ofxDatGui::draw()
             // Restore original opacities.
             for (auto & pair : muted) {
                 pair.first->setOpacity(pair.second);
-                pair.first->applyMutedPalette(mOwnedTheme ? mOwnedTheme.get() : ofxDatGuiComponent::getTheme(), false);
+                pair.first->applyMutedPalette(getActiveTheme(), false);
             }
         }
     ofPopStyle();

@@ -103,9 +103,10 @@ class ofxDatGuiTheme{
                 ofColor inputAreaBackground = ofColor::fromHex(0x2A2A2A);
             } muted;
             
-        // component specific colors //
+            // component specific colors //
             struct {
                 ofColor fill = ofColor::fromHex(0x2FA1D6);
+                ofColor hover = ofColor::fromHex(0x2FA1D6);
                 ofColor text = ofColor::fromHex(0x2FA1D6);
             } slider;
             

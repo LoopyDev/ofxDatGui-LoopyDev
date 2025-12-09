@@ -80,6 +80,31 @@ class ofxDatGuiInteractiveObject{
         void onButtonEvent(onButtonEventCallback callback) {
             buttonEventCallback = callback;
         }
+
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& addButtonListener(T* owner, void (ListenerClass::*listenerMethod)(ofxDatGuiButtonEvent))
+        {
+            buttonEventCallback = std::bind(listenerMethod, owner, std::placeholders::_1);
+            return *this;
+        }
+
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& addButtonListener(T* owner, void (ListenerClass::*listenerMethod)())
+        {
+            // Allow no-arg handlers; wrap them to match the event signature.
+            buttonEventCallback = [owner, listenerMethod](ofxDatGuiButtonEvent) {
+                (owner->*listenerMethod)();
+            };
+            return *this;
+        }
+
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& removeButtonListener(T* /*owner*/, void (ListenerClass::*/*listenerMethod*/)(ofxDatGuiButtonEvent))
+        {
+            // Single-listener storage: removing simply clears the callback.
+            buttonEventCallback = nullptr;
+            return *this;
+        }
     
     // toggle events //
         typedef std::function<void(ofxDatGuiToggleEvent)> onToggleEventCallback;
@@ -93,6 +118,20 @@ class ofxDatGuiInteractiveObject{
 
         void onToggleEvent(onToggleEventCallback callback) {
             toggleEventCallback = callback;
+        }
+
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& addToggleListener(T* owner, void (ListenerClass::*listenerMethod)(ofxDatGuiToggleEvent))
+        {
+            toggleEventCallback = std::bind(listenerMethod, owner, std::placeholders::_1);
+            return *this;
+        }
+
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& removeToggleListener(T* /*owner*/, void (ListenerClass::*/*listenerMethod*/)(ofxDatGuiToggleEvent))
+        {
+            toggleEventCallback = nullptr;
+            return *this;
         }
     
     // slider events //
@@ -121,6 +160,38 @@ class ofxDatGuiInteractiveObject{
     
         void onTextInputEvent(onTextInputEventCallback callback) {
             textInputEventCallback = callback;
+        }
+
+        // Convenience listener helpers (ofxGui-style).
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& addTextInputListener(T* owner, void (ListenerClass::*listenerMethod)(ofxDatGuiTextInputEvent))
+        {
+            textInputEventCallback = std::bind(listenerMethod, owner, std::placeholders::_1);
+            return *this;
+        }
+
+        // No-arg convenience; wraps a void() member into the event signature.
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& addTextInputListener(T* owner, void (ListenerClass::*listenerMethod)())
+        {
+            textInputEventCallback = [owner, listenerMethod](ofxDatGuiTextInputEvent) {
+                (owner->*listenerMethod)();
+            };
+            return *this;
+        }
+
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& removeTextInputListener(T* /*owner*/, void (ListenerClass::*/*listenerMethod*/)(ofxDatGuiTextInputEvent))
+        {
+            textInputEventCallback = nullptr;
+            return *this;
+        }
+
+        template<typename T, class ListenerClass>
+        ofxDatGuiInteractiveObject& removeTextInputListener(T* /*owner*/, void (ListenerClass::*/*listenerMethod*/)())
+        {
+            textInputEventCallback = nullptr;
+            return *this;
         }
 
     // color picker events //

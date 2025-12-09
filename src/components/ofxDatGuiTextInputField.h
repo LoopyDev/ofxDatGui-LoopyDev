@@ -22,6 +22,7 @@
 
 #pragma once
 #include "ofxDatGuiIntObject.h"
+#include <algorithm>
 
 class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
 
@@ -118,6 +119,10 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
     
         void setText(string text)
         {
+            unsigned int maxChars = maxCharactersForType();
+            if (text.size() > maxChars) {
+                text = text.substr(0, maxChars);
+            }
             mText = text;
             mTextChanged = true;
             mRendered = mUpperCaseText ? ofToUpper(mText) : mText;
@@ -187,8 +192,11 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
         void onKeyPressed(int key)
         {
             if (!keyIsValid(key)) return;
+
+            const unsigned int maxChars = maxCharactersForType();
+
             if (mHighlightText) {
-            // if key is printable or delete
+                // if key is printable or delete
                 if ((key >= 32 && key <= 255) || key == OF_KEY_BACKSPACE || key == OF_KEY_DEL) {
                     setText("");
                     setCursorIndex(0);
@@ -201,13 +209,17 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
                     setCursorIndex(mCursorIndex - 1);
                 }
             } else if (key == OF_KEY_LEFT) {
-                setCursorIndex(max( (int) mCursorIndex - 1, 0));
+                setCursorIndex(std::max(static_cast<int>(mCursorIndex) - 1, 0));
             } else if (key == OF_KEY_RIGHT) {
-                setCursorIndex(std::min( mCursorIndex + 1, (unsigned int) mText.size()));
+                setCursorIndex(std::min( mCursorIndex + 1, static_cast<unsigned int>(mText.size())));
             } else {
             // insert character at cursor position //
-                setText(mText.substr(0, mCursorIndex) + (char)key + mText.substr(mCursorIndex));
-                setCursorIndex(mCursorIndex + 1);
+                if (!mHighlightText && mText.size() >= maxChars) {
+                    mHighlightText = false;
+                    return;
+                }
+                setText(mText.substr(0, mCursorIndex) + static_cast<char>(key) + mText.substr(mCursorIndex));
+                setCursorIndex(std::min(mCursorIndex + 1, static_cast<unsigned int>(mText.size())));
             }
             mHighlightText = false;
         }
@@ -231,12 +243,17 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
         {
             if (key == OF_KEY_BACKSPACE || key == OF_KEY_LEFT || key == OF_KEY_RIGHT){
                 return true;
-            }   else if (mType == ofxDatGuiInputType::COLORPICKER){
-            // limit string length to six hex characters //
-                if (!mHighlightText && mText.size() == 6){
+            }
+
+            const unsigned int maxChars = maxCharactersForType();
+
+            if (mType == ofxDatGuiInputType::COLORPICKER){
+                // limit string length to hex characters //
+                if (!mHighlightText && mText.size() >= maxChars){
                     return false;
+                }
             // allow numbers 0-9 //
-                }   else if (key>=48 && key<=57){
+                if (key>=48 && key<=57){
                     return true;
             // allow letters a-f & A-F //
                 }   else if ((key>=97 && key<=102) || (key>=65 && key<=70)){
@@ -246,6 +263,9 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
                     return false;
                 }
             }   else if (mType == ofxDatGuiInputType::NUMERIC){
+                if (!mHighlightText && mText.size() >= maxChars){
+                    return false;
+                }
             // allow dash (-) or dot (.) //
                 if (key==45 || key==46){
                     return true;
@@ -258,6 +278,9 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
                 }
             }   else if (mType == ofxDatGuiInputType::ALPHA_NUMERIC){
             // limit range to printable characters http://www.ascii-code.com //
+                if (!mHighlightText && mText.size() >= maxChars){
+                    return false;
+                }
                 if (key >= 32 && key <= 255) {
                     return true;
                 }   else {
@@ -299,5 +322,12 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
         ofxDatGuiInputType mType;
         shared_ptr<ofxSmartFont> mFont;
 
-};
+        unsigned int maxCharactersForType() const
+        {
+            if (mType == ofxDatGuiInputType::COLORPICKER){
+                return std::min<unsigned int>(mMaxCharacters, 6);
+            }
+            return mMaxCharacters;
+        }
 
+};
