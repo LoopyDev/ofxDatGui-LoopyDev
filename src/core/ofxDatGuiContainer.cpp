@@ -1,4 +1,5 @@
 #include "ofxDatGuiContainer.h"
+#include "ofxDatGui.h"
 #include <utility>
 
 void ofxDatGuiContainer::emplaceChild(ComponentPtr child) {
@@ -20,8 +21,25 @@ void ofxDatGuiContainer::update(bool parentEnabled) {
 	// delegating to children.
 	ofxDatGuiComponent::update(parentEnabled);
 
+	ofxDatGui* root = getRoot();
+	ofxDatGuiComponent* focusedInput = root ? root->getTextInputFocus() : nullptr;
+	
 	// If parent blocked interaction or we're disabled, children should also be blocked.
 	if (!parentEnabled || !getEnabled()) {
+		return;
+	}
+
+	// Collapsed containers should still update their own header state, but skip children.
+	if (!getIsExpanded()) {
+		return;
+	}
+
+	if (focusedInput != nullptr) {
+		for (auto & child : children) {
+			if (!child || !child->getVisible()) continue;
+			const bool allow = root && root->isInTextInputFocusBranch(child.get());
+			child->update(parentEnabled && allow);
+		}
 		return;
 	}
 

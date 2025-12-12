@@ -58,6 +58,7 @@ ofxDatGuiComponent::ofxDatGuiComponent(string label)
     mAnchor = ofxDatGuiAnchor::NO_ANCHOR;
     mLabel.text = label;
     mLabel.alignment = ofxDatGuiAlignment::LEFT;
+    mAllowSlideEffect = true;
 }
 
 ofxDatGuiComponent::~ofxDatGuiComponent()
@@ -80,6 +81,34 @@ ofxDatGuiComponent::~ofxDatGuiComponent()
 void ofxDatGuiComponent::setIndex(int index)
 {
     mIndex = index;
+}
+
+bool ofxDatGuiComponent::isRootClampingPanels() const {
+    if (auto* r = getRoot()) {
+        return r->getClampPanelsToWindow();
+    }
+    return false;
+}
+
+int ofxDatGuiComponent::getRootClampMinVisibleWidth() const {
+    if (auto* r = getRoot()) {
+        return r->getClampPanelsMinVisibleWidth();
+    }
+    return 0;
+}
+
+int ofxDatGuiComponent::getRootClampMinVisibleHeight() const {
+    if (auto* r = getRoot()) {
+        return r->getClampPanelsMinVisibleHeight();
+    }
+    return 0;
+}
+
+bool ofxDatGuiComponent::isRootSlidingPanels() const {
+    if (auto* r = getRoot()) {
+        return r->isSlidingPanels();
+    }
+    return false;
 }
 
 int ofxDatGuiComponent::getIndex()
@@ -118,6 +147,8 @@ void ofxDatGuiComponent::setComponentStyle(const ofxDatGuiTheme* theme)
     mStyle.height = theme->layout.height;
     mStyle.padding = theme->layout.padding;
     mStyle.vMargin = theme->layout.vMargin;
+    mStyle.color.panelBackground = theme->color.panelBackground;
+    mStyle.color.panelHeader = theme->color.panelHeader;
     mStyle.color.background = theme->color.background;
     mStyle.color.inputArea = theme->color.inputAreaBackground;
     mStyle.color.onMouseOver = theme->color.backgroundOnMouseOver;
@@ -411,12 +442,16 @@ void ofxDatGuiComponent::applyMutedPalette(const ofxDatGuiTheme* theme, bool mut
 
 	// Pick muted or normal palettes field-by-field to avoid type mismatch.
 	ofColor bg = muted ? theme->color.muted.background : theme->color.background;
+	ofColor panelBg = muted ? theme->color.muted.panelBackground : theme->color.panelBackground;
+	ofColor panelHeader = muted ? theme->color.muted.panelHeader : theme->color.panelHeader;
 	ofColor bgOver = muted ? theme->color.muted.backgroundOnMouseOver : theme->color.backgroundOnMouseOver;
 	ofColor bgDown = muted ? theme->color.muted.backgroundOnMouseDown : theme->color.backgroundOnMouseDown;
 	ofColor label = muted ? theme->color.muted.label : theme->color.label;
 	ofColor icon = muted ? theme->color.muted.icons : theme->color.icons;
 
 	setBackgroundColors(bg, bgOver, bgDown);
+	mStyle.color.panelBackground = panelBg;
+	mStyle.color.panelHeader = panelHeader;
 	setLabelColor(label);
 	setIconColor(icon);
 
@@ -470,16 +505,35 @@ static bool mousePressedThisFrame() {
 }
 
 void ofxDatGuiComponent::update(bool acceptEvents) {
-	if (!acceptEvents || !mEnabled || !mVisible) {
-		// Skip interaction/hover when events are blocked or we're disabled/hidden.
+	auto* root = getRoot();
+	ofxDatGuiComponent* focusedTextInput = root ? root->getTextInputFocus() : nullptr;
+	const bool inTextInputBranch = root ? root->isInTextInputFocusBranch(this) : false;
+
+	bool allowSelfEvents = acceptEvents;
+	bool allowChildEvents = acceptEvents;
+	if (focusedTextInput != nullptr) {
+		if (!inTextInputBranch) {
+			allowSelfEvents = false;
+			allowChildEvents = false;
+		} else if (this != focusedTextInput) {
+			// Allow traversal to the focused input but mute this component's own hover/press.
+			allowSelfEvents = false;
+		}
+	}
+
+	const bool enabledVisible = mEnabled && mVisible;
+	if (!enabledVisible) {
 		mMouseOver = false;
-		// Do not force-release capture here; owner manages it.
 		if (this->getIsExpanded()) {
 			forEachChild([&](ofxDatGuiComponent* c){
 				if (c->getVisible()) c->update(false);
 			});
 		}
 		return;
+	}
+
+	if (!allowSelfEvents) {
+		mMouseOver = false;
 	}
 
 	const bool mp = ofGetMousePressed();
@@ -491,7 +545,6 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 	// Local to mask (only for vertical clip test)
 	const ofPoint mouseLocal(mouseAbs.x - mMask.x, mouseAbs.y - mMask.y);
 
-	auto* root = getRoot();
 	ofxDatGuiComponent* capture = root ? root->getMouseCapture() : nullptr;
 
 	// Only allow hover/highlight when not pressed, or when THIS component owns the press.
@@ -506,10 +559,12 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 	// Block highlighting on drag-in or while another widget owns the press:
 	const bool over = hoverAllowed && overGeom;
 
-	if (over && !mMouseOver) onMouseEnter(mouseAbs);
-	if (!over && mMouseOver) onMouseLeave(mouseAbs);
+	if (allowSelfEvents) {
+		if (over && !mMouseOver) onMouseEnter(mouseAbs);
+		if (!over && mMouseOver) onMouseLeave(mouseAbs);
+	}
 
-	if (acceptEvents && mEnabled && mVisible) {
+	if (allowSelfEvents) {
 		if (mp) {
 			if (capture == this) {
 				// We already own this press > keep dragging
@@ -522,7 +577,7 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 				if (!mFocused) onFocus();
 			}
 			// else: press started elsewhere > ignore (no capture on drag-in)
-	} else {
+		} else {
 			if (capture == this) {
 				// Mouse went up; we were the owner ? release, even if mMouseDown was toggled elsewhere
 				onMouseRelease(mouseAbs);
@@ -541,11 +596,11 @@ void ofxDatGuiComponent::update(bool acceptEvents) {
 
 	}
 
-		if (this->getIsExpanded()) {
-			forEachChild([&](ofxDatGuiComponent* c){
-				if (c->getVisible()) c->update(acceptEvents);
-			});
-		}
+	if (this->getIsExpanded()) {
+		forEachChild([&](ofxDatGuiComponent* c){
+			if (c->getVisible()) c->update(allowChildEvents && enabledVisible);
+		});
+	}
 }
 
 

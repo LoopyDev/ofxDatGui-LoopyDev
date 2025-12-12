@@ -103,12 +103,12 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 - [x] Change `ofxDatGui::items` from raw pointers to `std::unique_ptr`:
   - [x] `using ComponentPtr = std::unique_ptr<ofxDatGuiComponent>;`
   - [x] `std::vector<ComponentPtr> items;`
-- [ ] Update all `addXxx(...)` functions:
+- [x] Update all `addXxx(...)` functions:
   - [x] Use `std::make_unique<T>(...)` to allocate.
   - [x] Store in `items` via `emplace_back(std::move(ptr));`
   - [x] Call `setRoot(this)` and theme setup on the raw pointer.
   - [x] Return raw non-owning pointer to user code for convenience.
-- [ ] Update loops:
+- [x] Update loops:
   - [x] Replace `for (int i=0; i<items.size(); ++i) items[i]->update(...);`
     with `for (auto& c : items) c->update(...);`, etc.
 - [x] Remove manual deletes in `ofxDatGui` destructor (RAII will handle it).
@@ -122,7 +122,7 @@ Use this checklist as you refactor the addon. Tick things off as you go.
 - [x] Ensure mouse-down/theme/width propagation walks RAII children rather than raw vectors.
 
 
-- [ ] In `ofxDatGuiContainer`, confirm:
+- [x] In `ofxDatGuiContainer`, confirm:
   - [x] `std::vector<std::unique_ptr<ofxDatGuiComponent>> children;`
   - [x] `addChild<T>` returns raw pointer, but stores `unique_ptr`.
 - [x] Ensure children are updated/drawn via RAII (no manual deletes).
@@ -244,3 +244,21 @@ You can drop this into `REFACTOR_ROADMAP.md` or merge into your main `README.md`
 - [ ] Phase 1 � Container base (done 2025-11-21)
 - [x] Phase 2 ? Mouse capture per root
 - [ ] Phase 6 � ofParameter integration
+---
+
+## Simplifying Theming
+
+- [ ] Remove legacy `guiBackground` once all remaining uses (legacy group gap fill, scroll view backing, root bookkeeping) are migrated to `panelBackground` or an explicit per-widget background.
+
+
+## Panel Mobility (Clamping / Sliding)
+
+- [x] Split panel visuals from buttons: panels use `panelBackground` + `panelHeader` (folders backfill gaps with `panelBackground`).
+- [x] Root-level clamping with per-panel overrides: `setClampPanelsToWindow`, min-visible sizes, top edge always clamped, `setDraggable`.
+- [x] Off-screen slide helpers (`slidePanelsOffscreen` / `slidePanelsBack`) with edge mask, respect-clamp toggle, per-panel opt-out, animated position + fade.
+- [ ] Add docs/examples for the clamp + slide API (edge masks, min-visible, participation flag).
+- [ ] Decide if per-panel clamp off should fully bypass root clamp when root clamp is enabled (currently root clamp still applies unless override is used).
+
+## Simplifying Theming (updates)
+
+- [x] Panel background/header now themed separately from buttons and used for folder backdrops.

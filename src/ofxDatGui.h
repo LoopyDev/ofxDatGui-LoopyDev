@@ -28,6 +28,9 @@
 #include "ofxDatGuiButtonBar.h"
 #include "ofxDatGuiPanel.h"
 #include <memory>
+#include <unordered_map>
+#include <cstdint>
+#include <initializer_list>
 
 
 class ofxDatGui : public ofxDatGuiInteractiveObject
@@ -39,6 +42,12 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
             VERTICAL,
             HORIZONTAL
         };
+        enum class SlideEdge : uint8_t { LEFT=1, RIGHT=2, TOP=4, BOTTOM=8 };
+        using SlideMask = uint8_t;
+        static constexpr SlideMask SlideAll = static_cast<SlideMask>(SlideEdge::LEFT) |
+                                              static_cast<SlideMask>(SlideEdge::RIGHT) |
+                                              static_cast<SlideMask>(SlideEdge::TOP) |
+                                              static_cast<SlideMask>(SlideEdge::BOTTOM);
     
         ofxDatGui(); // stack-friendly default (no anchor)
         ofxDatGui(int x, int y);
@@ -57,12 +66,9 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void toggle();
         void collapse();
     
-        void setWidth(int width, float labelWidth = 0.35f);
         void setVisible(bool visible);
         void setEnabled(bool enabled);
         void setOpacity(float opacity);
-        void setPosition(int x, int y);
-        void setPosition(ofxDatGuiAnchor anchor);
         void setTheme(ofxDatGuiTheme* t, bool applyImmediately = false);
         void setTheme(std::unique_ptr<ofxDatGuiTheme> t, bool applyImmediately = true);
         void setAutoDraw(bool autodraw, int priority = 0);
@@ -70,6 +76,19 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void setBringToFrontOnInteract(bool enable) { ensureSetup(); mBringToFrontOnInteract = enable; }
         void setMuteUnfocusedPanels(bool enable) { ensureSetup(); mMuteUnfocusedPanels = enable; }
         void setActiveOnHover(bool enable) { ensureSetup(); mActiveOnHover = enable; }
+        void setClampPanelsToWindow(bool enable) { ensureSetup(); mClampPanelsToWindow = enable; }
+        bool getClampPanelsToWindow() const { return mClampPanelsToWindow; }
+        void setClampPanelsMinVisible(int minWidth, int minHeight) { ensureSetup(); mClampPanelsMinVisibleWidth = std::max(0, minWidth); mClampPanelsMinVisibleHeight = std::max(0, minHeight); }
+        int getClampPanelsMinVisibleWidth() const { return mClampPanelsMinVisibleWidth; }
+        int getClampPanelsMinVisibleHeight() const { return mClampPanelsMinVisibleHeight; }
+        // Slide panels off-screen toward their nearest edge; respectClamp decides whether to leave the min-visible area on-screen.
+        void slidePanelsOffscreen(bool respectClamp = true, bool animate = false, SlideMask allowedEdges = SlideAll);
+        // Convenience overload: pass allowed edges as a list of flags.
+        void slidePanelsOffscreen(bool respectClamp, bool animate, std::initializer_list<SlideEdge> allowedEdges);
+        // Restore panels to their original positions after a slide.
+        void slidePanelsBack(bool animate = false);
+        // Whether panels are currently sliding or held off-screen.
+        bool isSlidingPanels() const { return mSlideAnimating || mPanelsSlidOut; }
         void relayout(); // explicit layout recompute without repositioning children
         void setLabelAlignment(ofxDatGuiAlignment align);
 
@@ -88,74 +107,17 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         void setMouseCapture(ofxDatGuiComponent* c);
         ofxDatGuiComponent* getMouseCapture() const;
         ofPoint getPosition();
+        ofxDatGuiComponent* getTextInputFocus() const { return mFocusedTextInput; }
+        bool isTextInputFocusActive() const { return mFocusedTextInput != nullptr; }
+        bool isAnyTextInputActive() const { return mFocusedTextInput != nullptr; }
+        bool isInTextInputFocusBranch(const ofxDatGuiComponent* c) const;
     
-        ofxDatGuiHeader* addHeader(string label = "", bool draggable = true);
-        ofxDatGuiFooter* addFooter();
-        ofxDatGuiLabel* addLabel(string label);
-        ofxDatGuiButton* addButton(string label);
-        ofxDatGuiToggle* addToggle(string label, bool state = false);
-        ofxDatGuiSlider* addSlider(string label, float min, float max);
-        ofxDatGuiSlider* addSlider(string label, float min, float max, float val);
-        ofxDatGuiSlider* addSlider(ofParameter<int> & p);
-        ofxDatGuiSlider* addSlider(ofParameter<float> & p);
-        ofxDatGuiTextInput* addTextInput(string label, string value = "");
-        ofxDatGuiDropdown* addDropdown(string label, vector<string> options);
-        ofxDatGuiFRM* addFRM(float refresh = 1.0f);
-        ofxDatGuiBreak* addBreak();
-        ofxDatGui2dPad* add2dPad(string label);
-        ofxDatGui2dPad* add2dPad(string label, ofRectangle bounds);
-        ofxDatGuiWaveMonitor* addWaveMonitor(string label, float min, float max);
-        ofxDatGuiValuePlotter* addValuePlotter(string label, float min, float max);
-        ofxDatGuiColorPicker* addColorPicker(string label, ofColor color = ofColor::black);
-        ofxDatGuiMatrix* addMatrix(string label, int numButtons, bool showLabels = false);
-        ofxDatGuiFolder* addFolder(string label, ofColor color = ofColor::white);
-        ofxDatGuiFolder* addFolder(ofxDatGuiFolder* folder);
-        // LoopyDev: add cubic-bezier editor
-        ofxDatGuiCubicBezier* addCubicBezier(string label,
-            float x1 = 0.25f, float y1 = 0.10f,
-            float x2 = 0.25f, float y2 = 1.00f,
-            float padAspect = 1.0f)
-        {
-            auto bez = makeOwned<ofxDatGuiCubicBezier>(label, x1, y1, x2, y2, padAspect);
-            auto * raw = static_cast<ofxDatGuiCubicBezier*>(bez.get());
-            // If you later want GUI-level routing, you can add a callback like other components.
-            attachItem(std::move(bez));
-            return raw;
-        }
-        // LoopyDev: add Radio Groups
-        ofxDatGuiRadioGroup * addRadioGroup(const std::string & label, const std::vector<std::string> & options);
-        // LoopyDev: add Curve Editor
-        ofxDatGuiCurveEditor * addCurveEditor(string label, float padAspect) {
-            auto curve = makeOwned<ofxDatGuiCurveEditor>("Response Curve", 0.6f /*padAspect*/);
-            auto * raw = static_cast<ofxDatGuiCurveEditor*>(curve.get());
-            attachItem(std::move(curve));
-            return raw;
-        };
-		// --- LoopyDev: add horizontal button bar ---
-        ofxDatGuiButtonBar * addButtonBar(const std::string & label,
-			const std::vector<std::string> & buttons);
+        // Panel-only API: root no longer hosts components directly.
 		// LoopyDev: add panel
 		ofxDatGuiPanel * addPanel(ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
         ofxDatGuiPanel& createPanel(const std::string& label = "", ofxDatGuiPanel::Orientation orientation = ofxDatGuiPanel::Orientation::VERTICAL);
 
-        ofxDatGuiHeader* getHeader();
-        ofxDatGuiFooter* getFooter();
-        ofxDatGuiLabel* getLabel(string label, string folder = "");
-        ofxDatGuiButton* getButton(string label, string folder = "");
-        ofxDatGuiToggle* getToggle(string label, string folder = "");
-        ofxDatGuiSlider* getSlider(string label, string folder = "");
-        ofxDatGui2dPad* get2dPad(string label, string folder = "");
-        ofxDatGuiTextInput* getTextInput(string label, string folder = "");
-        ofxDatGuiColorPicker* getColorPicker(string label, string folder = "");
-        ofxDatGuiMatrix* getMatrix(string label, string folder = "");
-        ofxDatGuiWaveMonitor* getWaveMonitor(string label, string folder = "");
-        ofxDatGuiValuePlotter* getValuePlotter(string label, string folder = "");
-        ofxDatGuiFolder* getFolder(string label);
-        ofxDatGuiDropdown* getDropdown(string label);
-		// LoopyDev: get Radio Groups
-		ofxDatGuiRadioGroup * getRadioGroup(string label);
-		// LoopyDev: get Button Bars
-		ofxDatGuiButtonBar * getButtonBar(string label);
+        // Component getters removed in panel-only mode. Retrieve components via panel references.
 
     private:
     
@@ -176,8 +138,28 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
         bool mBringToFrontOnInteract = false;
         bool mMuteUnfocusedPanels = false;
         bool mActiveOnHover = false;
+        bool mClampPanelsToWindow = false;
+        int mClampPanelsMinVisibleWidth = 0;
+        int mClampPanelsMinVisibleHeight = 0;
+        bool mPanelsSlidOut = false;
+        bool mSlideRespectClamp = true;
+        std::unordered_map<ofxDatGuiComponent*, ofPoint> mSavedPanelPositions;
+        struct SlideAnimTarget {
+            ofPoint start;
+            ofPoint target;
+            float startOpacity;
+            float targetOpacity;
+        };
+        std::unordered_map<ofxDatGuiComponent*, SlideAnimTarget> mSlideAnimTargets;
+        bool mSlideAnimating = false;
+        bool mSlideToOff = false;
+        float mSlideProgress = 0.f;
+        float mSlideDuration = 0.25f; // seconds
+        float mSlideHiddenOpacity = 0.5f;
+        std::unordered_map<ofxDatGuiComponent*, float> mSavedPanelOpacities;
         bool mUserWidthSet = false;
         ofxDatGuiComponent* mLastFocusedPanel = nullptr;
+        ofxDatGuiComponent* mFocusedTextInput = nullptr;
         ofxDatGuiComponent* mMouseCaptureOwner = nullptr;
         bool mAlphaChanged;
         bool mWidthChanged;
@@ -189,9 +171,7 @@ class ofxDatGui : public ofxDatGuiInteractiveObject
 
         ofPoint mPosition;
         ofRectangle mGuiBounds;
-        ofxDatGuiAnchor mAnchor;
-        ofxDatGuiHeader* mGuiHeader;
-        ofxDatGuiFooter* mGuiFooter;
+        // Root now only manages panels; no header/footer or anchor.
         std::unique_ptr<ofxDatGuiTheme> mOwnedTheme;
         std::unique_ptr<ofxDatGuiTheme> mPendingOwnedTheme;
         const ofxDatGuiTheme* mBorrowedTheme = nullptr;

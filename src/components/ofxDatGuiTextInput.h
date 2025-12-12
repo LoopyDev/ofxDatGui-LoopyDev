@@ -103,6 +103,16 @@ class ofxDatGuiTextInput : public ofxDatGuiComponent {
         {
             return mInput.hitTest(m);
         }
+
+        bool hasFocusedTextInputField() override
+        {
+            return mInput.hasFocus();
+        }
+
+        bool hitTestTextInputField(const ofPoint& m) override
+        {
+            return mInput.hitTest(m);
+        }
     
         void dispatchEvent()
         {
@@ -136,6 +146,9 @@ class ofxDatGuiTextInput : public ofxDatGuiComponent {
                 onFocusLost();
             }
             ofxDatGuiComponent::onMousePress(m);
+            if (mInput.hitTest(m)) {
+                mInput.onMousePress(m);
+            }
         }
 
         void onMouseRelease(ofPoint m)
@@ -143,6 +156,16 @@ class ofxDatGuiTextInput : public ofxDatGuiComponent {
             ofxDatGuiComponent::onMouseRelease(m);
             if (mInput.hitTest(m) == false) {
                 onFocusLost();
+            } else {
+                mInput.onMouseRelease(m);
+            }
+        }
+
+        void onMouseDrag(ofPoint m)
+        {
+            ofxDatGuiComponent::onMouseDrag(m);
+            if (mInput.hitTest(m)) {
+                mInput.onMouseDrag(m);
             }
         }
     
@@ -162,4 +185,3 @@ class ofxDatGuiTextInput : public ofxDatGuiComponent {
         ofxDatGuiTextInputField mInput;
     
 };
-

@@ -36,6 +36,7 @@ class ofxDatGuiThemeSmoke : public ofxDatGuiTheme{
             stripe.visible = false;
             color.label = hex(0xF8F3F0);
             color.guiBackground = hex(0x2C3137);
+            color.panelBackground = color.guiBackground;
             color.background = hex(0x343B41);
             color.slider.fill = hex(0x60B9ED);
             color.slider.hover = color.slider.fill;
@@ -63,6 +64,7 @@ class ofxDatGuiThemeWireframe : public ofxDatGuiTheme{
             color.icons = hex(0x6E6E6E);
             color.background = hex(0xFCFAFD);
             color.guiBackground = hex(0xD8D8DB);
+            color.panelBackground = color.guiBackground;
             color.inputAreaBackground = hex(0xE9E9E9);
             color.slider.fill = hex(0x6E6E6E);
             color.slider.hover = color.slider.fill;
@@ -93,6 +95,7 @@ class ofxDatGuiThemeMidnight : public ofxDatGuiTheme{
             color.label = hex(0xffffff);
             color.background = hex(0x011726);
             color.guiBackground = hex(0x4C5B66);
+            color.panelBackground = color.guiBackground;
             color.inputAreaBackground = hex(0x273946);
             color.slider.fill = hex(0x0A1E2E);
             color.slider.hover = color.slider.fill;
@@ -118,6 +121,7 @@ class ofxDatGuiThemeAqua : public ofxDatGuiTheme{
             stripe.visible = false;
             color.label = hex(0xF8F3F0);
             color.guiBackground = hex(0xF8F3F0);
+            color.panelBackground = color.guiBackground;
             color.background = hex(0x445966);
             color.inputAreaBackground = hex(0x61717D);
             color.slider.fill = hex(0xF8F3F0);
@@ -145,6 +149,7 @@ class ofxDatGuiThemeCharcoal : public ofxDatGuiTheme{
             color.icons = hex(0x9C9DA1);
             color.background = hex(0x28292E);
             color.guiBackground = hex(0x1E1F24);
+            color.panelBackground = color.guiBackground;
             color.inputAreaBackground = hex(0x42424A);
             color.slider.fill = hex(0xF4BF39);
             color.slider.hover = color.slider.fill;
@@ -170,6 +175,7 @@ class ofxDatGuiThemeAutumn : public ofxDatGuiTheme{
             stripe.visible = false;
             color.label = hex(0xF8F3F0);
             color.guiBackground = hex(0x7d7066);
+            color.panelBackground = color.guiBackground;
             color.background = hex(0x4C4743);
             color.inputAreaBackground = hex(0xB5BCB2);
             color.slider.fill = hex(0xFFB230);
@@ -197,6 +203,7 @@ class ofxDatGuiThemeCandy : public ofxDatGuiTheme{
             color.icons = hex(0xFFFFFF);
             color.background = hex(0xFF4081);
             color.guiBackground = hex(0xEEEEEE);
+            color.panelBackground = color.guiBackground;
             color.inputAreaBackground = hex(0xFF80AB);
             color.slider.fill = hex(0xF50057);
             color.slider.hover = color.slider.fill;
@@ -227,6 +234,7 @@ class ofxDatGuiThemeRetroGreen : public ofxDatGuiTheme{
             color.label = hex(0x9BF87F);
             color.icons = hex(0x9BF87F);
             color.guiBackground = hex(0x050A05);
+            color.panelBackground = color.guiBackground;
             color.background = hex(0x0A120A);
             color.inputAreaBackground = hex(0x0F1E0F);
             color.slider.fill = hex(0x74FF4C);
@@ -253,6 +261,3 @@ class ofxDatGuiThemeRetroGreen : public ofxDatGuiTheme{
             init();
         }
 };
-
-
-

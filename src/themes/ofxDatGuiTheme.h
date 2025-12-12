@@ -81,6 +81,7 @@ class ofxDatGuiTheme{
         
         // global gui background color //
             ofColor guiBackground = ofColor::fromHex(0x303030);
+            ofColor panelBackground = ofColor::fromHex(0x303030);
             ofColor panelHeader = ofColor::fromHex(0x3A3A3A); // slightly lighter than background
         
         // general colors that are shared by all components //
@@ -94,6 +95,7 @@ class ofxDatGuiTheme{
             // Muted variant (used when panels are unfocused).
             struct MutedColors {
                 ofColor guiBackground = ofColor::fromHex(0x252525);
+                ofColor panelBackground = ofColor::fromHex(0x252525);
                 ofColor panelHeader = ofColor::fromHex(0x2F2F2F);
                 ofColor label = ofColor::fromHex(0xAAAAAA);
                 ofColor icons = ofColor::fromHex(0xAAAAAA);
@@ -210,7 +212,7 @@ class ofxDatGuiTheme{
         
             struct {
                 int highlightPadding = 5;
-                bool forceUpperCase = true;
+                bool forceUpperCase = false;
             } textInput;
             
             struct {
@@ -268,6 +270,4 @@ class ofxDatGuiTheme{
         }
 
 };
-
-
 

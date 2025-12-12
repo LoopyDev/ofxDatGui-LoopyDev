@@ -23,6 +23,7 @@
 #pragma once
 #include "ofxDatGuiComponent.h"
 #include "ofxDatGuiTextInputField.h"
+#include <algorithm>
 #include <cmath>
 
 class ofxDatGuiSlider : public ofxDatGuiComponent {
@@ -76,10 +77,31 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
         void setWidth(int width, float labelWidth)
         {
             ofxDatGuiComponent::setWidth(width, labelWidth);
-            float totalWidth = mStyle.width - mLabel.width;
-            mSliderWidth = totalWidth * .7;
-            mInputX = mLabel.width + mSliderWidth + mStyle.padding;
-            mInputWidth = totalWidth - mSliderWidth - (mStyle.padding * 2);
+            const int totalWidth = mStyle.width - mLabel.width;
+            const int minInputWidth = 48;
+            const int minSliderWidth = 40;
+            const float preferredSliderShare = 0.82f; // give most of the space to the slider bar
+            const int paddingPx = static_cast<int>(std::round(mStyle.padding * 2.f));
+            const int usable = std::max(0, totalWidth - paddingPx);
+
+            int sliderWidth = static_cast<int>(usable * preferredSliderShare);
+            sliderWidth = std::max(minSliderWidth, std::min(sliderWidth, usable));
+            int inputWidth = usable - sliderWidth;
+
+            // Ensure the input has room; steal from the slider if necessary.
+            if (inputWidth < minInputWidth) {
+                inputWidth = std::min(minInputWidth, usable);
+                sliderWidth = std::max(0, usable - inputWidth);
+                // If we still have room, keep a minimal slider width.
+                if (sliderWidth < minSliderWidth && usable >= minSliderWidth) {
+                    sliderWidth = minSliderWidth;
+                    inputWidth = std::max(0, usable - sliderWidth);
+                }
+            }
+
+            mSliderWidth = sliderWidth;
+            mInputWidth = inputWidth;
+            mInputX = mLabel.width + mSliderWidth + static_cast<int>(std::round(mStyle.padding));
             mInput->setWidth(mInputWidth);
             mInput->setPosition(x + mInputX, y + mStyle.padding);
         }
@@ -238,6 +260,16 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
                 return false;
             }
         }
+
+        bool hasFocusedTextInputField() override
+        {
+            return mInput != nullptr && mInput->hasFocus();
+        }
+
+        bool hitTestTextInputField(const ofPoint& m) override
+        {
+            return mInput != nullptr && mInput->hitTest(m);
+        }
     
         void dispatchEvent()
         {
@@ -374,4 +406,3 @@ class ofxDatGuiSlider : public ofxDatGuiComponent {
         }
         
 };
-

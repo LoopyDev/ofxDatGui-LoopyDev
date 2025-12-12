@@ -47,12 +47,12 @@ class ofxDatGui2dPad : public ofxDatGuiComponent {
             ofAddListener(ofEvents().windowResized, this, &ofxDatGui2dPad::onWindowResized);
         }
     
-        ~ofxDatGui2dPad()
+        ~ofxDatGui2dPad() override
         {
             ofRemoveListener(ofEvents().windowResized, this, &ofxDatGui2dPad::onWindowResized);
         }
     
-        void setTheme(const ofxDatGuiTheme* theme)
+        void setTheme(const ofxDatGuiTheme* theme) override
         {
             setComponentStyle(theme);
             mStyle.height = theme->layout.pad2d.height;
@@ -63,6 +63,14 @@ class ofxDatGui2dPad : public ofxDatGuiComponent {
             mBallSize = theme->layout.pad2d.ballSize;
             mLineWeight = theme->layout.pad2d.lineWeight;
             mPad = ofRectangle(0, 0, mStyle.width - mStyle.padding - mLabel.width, mStyle.height - (mStyle.padding * 2));
+        }
+
+        void setWidth(int width, float labelWidth) override
+        {
+            ofxDatGuiComponent::setWidth(width, labelWidth);
+            // Pad dimensions depend on width/label/padding.
+            mPad.width = mStyle.width - mStyle.padding - mLabel.width;
+            mPad.height = mStyle.height - (mStyle.padding * 2);
         }
     
         void setPoint(ofPoint pt)
@@ -85,6 +93,8 @@ class ofxDatGui2dPad : public ofxDatGuiComponent {
         {
             mBounds = bounds;
             mScaleOnResize = scaleOnResize;
+            mLastWindowWidth = ofGetWidth();
+            mLastWindowHeight = ofGetHeight();
             setWorldCoordinates();
         }
     
@@ -100,7 +110,7 @@ class ofxDatGui2dPad : public ofxDatGuiComponent {
             setWorldCoordinates();
         }
     
-        void draw()
+        void draw() override
         {
             if (!mVisible) return;
             ofPushStyle();
@@ -141,7 +151,7 @@ class ofxDatGui2dPad : public ofxDatGuiComponent {
             mWorld.y = mBounds.y + (mBounds.height * mPercentY);
         }
     
-        void onMouseDrag(ofPoint m)
+        void onMouseDrag(ofPoint m) override
         {
             if (mPad.inside(m)){
                 mPercentX = (m.x-mPad.x) / mPad.width;
@@ -153,12 +163,16 @@ class ofxDatGui2dPad : public ofxDatGuiComponent {
     
         void onWindowResized(ofResizeEventArgs &e)
         {
-        // scale the bounds to the resized window //
-            if (mScaleOnResize){
-                mBounds.width *= (ofGetWidth() / mBounds.width);
-                mBounds.height *= (ofGetHeight() / mBounds.height);
-                setWorldCoordinates();
-            }
+            if (!mScaleOnResize) return;
+            float scaleX = (mLastWindowWidth > 0) ? static_cast<float>(e.width) / mLastWindowWidth : 1.f;
+            float scaleY = (mLastWindowHeight > 0) ? static_cast<float>(e.height) / mLastWindowHeight : 1.f;
+            mBounds.x *= scaleX;
+            mBounds.y *= scaleY;
+            mBounds.width *= scaleX;
+            mBounds.height *= scaleY;
+            mLastWindowWidth = e.width;
+            mLastWindowHeight = e.height;
+            setWorldCoordinates();
         }
     
     private:
@@ -166,6 +180,8 @@ class ofxDatGui2dPad : public ofxDatGuiComponent {
         ofPoint mWorld;
         ofRectangle mPad;
         ofRectangle mBounds;
+        float mLastWindowWidth = 0.f;
+        float mLastWindowHeight = 0.f;
         float mPercentX;
         float mPercentY;
         int mBallSize;

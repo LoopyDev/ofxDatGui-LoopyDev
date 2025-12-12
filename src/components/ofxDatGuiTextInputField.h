@@ -23,6 +23,7 @@
 #pragma once
 #include "ofxDatGuiIntObject.h"
 #include <algorithm>
+#include <vector>
 
 class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
 
@@ -35,6 +36,7 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
             mHighlightText = false;
             mMaxCharacters = 99;
             mType = ofxDatGuiInputType::ALPHA_NUMERIC;
+            mCursorIndex = 0;
             setTheme(ofxDatGuiComponent::getTheme());
         }
     
@@ -60,42 +62,149 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
             color.highlight = theme->color.textInput.highlight;
             mUpperCaseText = theme->layout.textInput.forceUpperCase;
             mHighlightPadding = theme->layout.textInput.highlightPadding;
+            mSpaceWidth = mFont->charAdvance(' ');
+            if (mSpaceWidth <= 0.f) {
+                // if the font does not report an advance for space, fall back to a measured gap
+                const float measured = mFont->rect("i i").width - mFont->rect("ii").width;
+                mSpaceWidth = measured > 0.f ? measured : mFont->rect("1").width;
+            }
             setText(mText);
         }
-    
+
+        float glyphWidth(int index) const
+        {
+            if (index < 0 || index >= static_cast<int>(mRendered.size())) return 0.f;
+            const auto c = static_cast<uint32_t>(static_cast<unsigned char>(mRendered[index]));
+            if (c == ' ') return mSpaceWidth;
+            float w = mFont->charAdvance(c);
+            return w > 0.f ? w : mFont->rect(mRendered.substr(index, 1)).width;
+        }
+
+        float hashWidth() const
+        {
+            float w = mFont->charAdvance('#');
+            return w > 0.f ? w : mFont->rect("#").width;
+        }
+
+        float cursorWidthAt(int index) const
+        {
+            int clamped = std::max(0, std::min(index, static_cast<int>(mRendered.size())));
+            float w = 0.f;
+            for (int i = 0; i < clamped; ++i) w += glyphWidth(i);
+            if (mType == ofxDatGuiInputType::COLORPICKER) w += hashWidth();
+            return w;
+        }
+
         void draw()
         {
-        // center the text //
-            int tx = mInputRect.x + mInputRect.width / 2 - mTextRect.width / 2;
-            int ty = mInputRect.y + mInputRect.height / 2 + mTextRect.height / 2;
+            const int padding = static_cast<int>(mHighlightPadding);
+            const float hashWidthValue = (mType == ofxDatGuiInputType::COLORPICKER) ? hashWidth() : 0.f;
+            const float avail = std::max(0.f, mInputRect.width - 2 * padding - hashWidthValue);
+
+            const int n = static_cast<int>(mRendered.size());
+            const int cursorIndex = std::min<int>(mCursorIndex, n);
+
+            // Precompute prefix widths: width from 0 to i (exclusive)
+            std::vector<float> prefix(n + 1, 0.f);
+            for (int i = 0; i < n; ++i) {
+                prefix[i + 1] = prefix[i] + glyphWidth(i);
+            }
+            auto widthRange = [&](int i, int j) -> float {
+                return prefix[j] - prefix[i]; // [i, j)
+            };
+
+            // 1) Move start leftwards as far as possible while the cursor still fits.
+            int startIndex = cursorIndex;
+            for (int s = cursorIndex; s >= 0; --s) {
+                float w = widthRange(s, cursorIndex);
+                if (w <= avail) {
+                    startIndex = s;
+                } else {
+                    break;
+                }
+            }
+
+            // 2) From that start, extend end as far right as possible.
+            int endIndex = cursorIndex;
+            for (int e = cursorIndex; e <= n; ++e) {
+                float w = widthRange(startIndex, e);
+                if (w <= avail) {
+                    endIndex = e;
+                } else {
+                    break;
+                }
+            }
+
+            // Fallback: if nothing fits (very narrow field), show at least the glyph under/after the cursor.
+            if (endIndex == startIndex && cursorIndex < n) {
+                startIndex = cursorIndex;
+                endIndex = cursorIndex + 1;
+            }
+
+            // Build visible substring
+            std::string display;
+            if (startIndex < endIndex) {
+                display = mRendered.substr(startIndex, endIndex - startIndex);
+            }
+
+            float tx = mInputRect.x + padding;
+
+            // Use a stable height to avoid vertical jitter when the substring changes
+            float fixedH = mFont->getLineHeight();
+            if (fixedH <= 0.f) fixedH = mFont->rect("Hg").height;
+            float ty = mInputRect.y + mInputRect.height / 2 + fixedH / 2;
+
             ofPushStyle();
-            // draw the input field background //
+                // background
                 if (mFocused && mType != ofxDatGuiInputType::COLORPICKER){
                     ofSetColor(color.active.background);
-                }   else {
+                } else {
                     ofSetColor(color.inactive.background);
                 }
                 ofDrawRectangle(mInputRect);
-            // draw the highlight rectangle //
-                if (mHighlightText){
-                    ofRectangle hRect;
-                    hRect.x = tx - mHighlightPadding;
-                    hRect.width = mTextRect.width + (mHighlightPadding * 2);
-                    hRect.y = ty - mHighlightPadding - mTextRect.height;
-                    hRect.height = mTextRect.height + (mHighlightPadding * 2);
-                    ofSetColor(color.highlight);
-                    ofDrawRectangle(hRect);
+
+                // highlight rectangle for selected range (if any)
+                if (mHighlightText && mSelectionStart != mSelectionEnd) {
+                    // Clamp selection to the visible window.
+                    const int selStartVisible = std::max(startIndex, static_cast<int>(mSelectionStart));
+                    const int selEndVisible   = std::min(endIndex,   static_cast<int>(mSelectionEnd));
+                    if (selStartVisible < selEndVisible) {
+                        float selX0 = widthRange(startIndex, selStartVisible);
+                        float selX1 = widthRange(startIndex, selEndVisible);
+                        ofRectangle hRect;
+                        const float dispH = fixedH;
+                        hRect.x = tx + hashWidthValue + selX0 - mHighlightPadding;
+                        hRect.width = (selX1 - selX0) + (mHighlightPadding * 2);
+                        hRect.y = ty - mHighlightPadding - dispH;
+                        hRect.height = dispH + (mHighlightPadding * 2);
+                        ofSetColor(color.highlight);
+                        ofDrawRectangle(hRect);
+                    }
                 }
-            // draw the text //
+
+                // text
                 ofColor tColor = mHighlightText ? color.active.text : color.inactive.text;
                 ofSetColor(tColor);
-                mFont->draw(mType == ofxDatGuiInputType::COLORPICKER ? "#" + mRendered : mRendered, tx, ty);
+                std::string toDraw;
+                if (mType == ofxDatGuiInputType::COLORPICKER) toDraw.push_back('#');
+                toDraw.append(display);
+                mFont->draw(toDraw, tx, ty);
+
+                // cursor
                 if (mFocused) {
-            // draw the cursor //
-                    ofDrawLine(ofPoint(tx + mCursorX, mInputRect.getTop()), ofPoint(tx + mCursorX, mInputRect.getBottom()));
+                    // cursor width from full string start, then subtract start offset
+                    float fullToCursor = widthRange(0, cursorIndex);
+                    float offsetToStart = widthRange(0, startIndex);
+                    float cursorX = std::max(0.f, fullToCursor - offsetToStart);
+                    if (cursorX > avail) cursorX = avail; // clamp within visible window
+                    cursorX += hashWidthValue;
+                    ofDrawLine(ofPoint(tx + cursorX, mInputRect.getTop()),
+                               ofPoint(tx + cursorX, mInputRect.getBottom()));
                 }
             ofPopStyle();
         }
+
+
     
         int getWidth()
         {
@@ -174,8 +283,8 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
         {
             mFocused = true;
             mTextChanged = false;
-            mHighlightText = true;
             setCursorIndex(mText.size());
+            setSelection(0, static_cast<unsigned int>(mText.size()));
         }
     
         void onFocusLost()
@@ -188,53 +297,110 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
                 internalEventCallback(e);
             }
         }
+
+        void onMousePress(ofPoint m)
+        {
+            if (!hitTest(m)) return;
+
+            uint64_t now = ofGetElapsedTimeMillis();
+            bool isDoubleClick = (now - mLastClickTime) < 250;
+            mLastClickTime = now;
+
+            if (isDoubleClick) {
+                // Select all text on double-click.
+                setCursorIndex(static_cast<int>(mText.size()));
+                setSelection(0, static_cast<unsigned int>(mText.size()));
+                return;
+            }
+
+            // Single click: move cursor to clicked position and start a drag selection.
+            unsigned int index = indexAtPosition(m.x);
+            setCursorIndex(static_cast<int>(index));
+            mSelectionAnchor = mCursorIndex;
+            setSelection(mCursorIndex, mCursorIndex);
+            mDragging = true;
+        }
+
+        void onMouseDrag(ofPoint m)
+        {
+            if (!mDragging) return;
+            unsigned int index = indexAtPosition(m.x);
+            setCursorIndex(static_cast<int>(index));
+            setSelection(mSelectionAnchor, mCursorIndex);
+        }
+
+        void onMouseRelease(ofPoint /*m*/)
+        {
+            mDragging = false;
+        }
     
         void onKeyPressed(int key)
         {
             if (!keyIsValid(key)) return;
 
             const unsigned int maxChars = maxCharactersForType();
+            bool shiftDown = ofGetKeyPressed(OF_KEY_SHIFT);
 
             if (mHighlightText) {
                 // if key is printable or delete
                 if ((key >= 32 && key <= 255) || key == OF_KEY_BACKSPACE || key == OF_KEY_DEL) {
-                    setText("");
-                    setCursorIndex(0);
+                    // Delete current selection before handling the key.
+                    eraseSelection();
                 }
             }
             if (key == OF_KEY_BACKSPACE){
             // delete character at cursor position //
-                if (mCursorIndex > 0) {
+                if (mHighlightText) {
+                    eraseSelection();
+                } else if (mCursorIndex > 0) {
                     setText(mText.substr(0, mCursorIndex - 1) + mText.substr(mCursorIndex));
                     setCursorIndex(mCursorIndex - 1);
                 }
             } else if (key == OF_KEY_LEFT) {
-                setCursorIndex(std::max(static_cast<int>(mCursorIndex) - 1, 0));
+                if (shiftDown) {
+                    if (!mHighlightText) {
+                        mSelectionAnchor = mCursorIndex;
+                    }
+                    setCursorIndex(std::max(static_cast<int>(mCursorIndex) - 1, 0));
+                    setSelection(mSelectionAnchor, mCursorIndex);
+                } else {
+                    setCursorIndex(std::max(static_cast<int>(mCursorIndex) - 1, 0));
+                    clearSelection();
+                }
             } else if (key == OF_KEY_RIGHT) {
-                setCursorIndex(std::min( mCursorIndex + 1, static_cast<unsigned int>(mText.size())));
+                if (shiftDown) {
+                    if (!mHighlightText) {
+                        mSelectionAnchor = mCursorIndex;
+                    }
+                    setCursorIndex(std::min( mCursorIndex + 1, static_cast<unsigned int>(mText.size())));
+                    setSelection(mSelectionAnchor, mCursorIndex);
+                } else {
+                    setCursorIndex(std::min( mCursorIndex + 1, static_cast<unsigned int>(mText.size())));
+                    clearSelection();
+                }
             } else {
             // insert character at cursor position //
                 if (!mHighlightText && mText.size() >= maxChars) {
                     mHighlightText = false;
                     return;
                 }
+                if (mHighlightText) {
+                    eraseSelection();
+                }
                 setText(mText.substr(0, mCursorIndex) + static_cast<char>(key) + mText.substr(mCursorIndex));
                 setCursorIndex(std::min(mCursorIndex + 1, static_cast<unsigned int>(mText.size())));
             }
-            mHighlightText = false;
+            if (!shiftDown) {
+                mHighlightText = false;
+                clearSelection();
+            }
         }
     
         void setCursorIndex(int index)
         {
-           if (index == 0) {
-               mCursorX = mFont->rect(mRendered.substr(0, index)).getLeft();
-           } else if (index > 0) {
-               mCursorX = mFont->rect(mRendered.substr(0, index)).getRight();
-           // if we're at a space append the width the font's '1' character //
-               if (mText.at(index - 1) == ' ') mCursorX += mFont->rect("1").width;
-           }
-            if (mType == ofxDatGuiInputType::COLORPICKER) mCursorX += mFont->rect("#").width;
-            mCursorIndex = index;
+            const int clamped = std::max(0, std::min(index, static_cast<int>(mRendered.size())));
+            mCursorX = cursorWidthAt(clamped);
+            mCursorIndex = static_cast<unsigned int>(clamped);
         }
     
     protected:
@@ -305,6 +471,12 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
         ofRectangle mTextRect;
         ofRectangle mInputRect;
         unsigned int mCursorIndex;
+        unsigned int mSelectionStart = 0;
+        unsigned int mSelectionEnd = 0;
+        unsigned int mSelectionAnchor = 0;
+        float mSpaceWidth = 0.f;
+        bool mDragging = false;
+        uint64_t mLastClickTime = 0;
         unsigned int mMaxCharacters;
         unsigned int mHighlightPadding;
         struct{
@@ -328,6 +500,94 @@ class ofxDatGuiTextInputField : public ofxDatGuiInteractiveObject{
                 return std::min<unsigned int>(mMaxCharacters, 6);
             }
             return mMaxCharacters;
+        }
+
+        void clearSelection()
+        {
+            mSelectionStart = mSelectionEnd = mSelectionAnchor = mCursorIndex;
+            mHighlightText = false;
+        }
+
+        void setSelection(unsigned int start, unsigned int end)
+        {
+            start = std::min(start, static_cast<unsigned int>(mRendered.size()));
+            end = std::min(end, static_cast<unsigned int>(mRendered.size()));
+            if (start == end) {
+                clearSelection();
+                return;
+            }
+            mSelectionStart = std::min(start, end);
+            mSelectionEnd = std::max(start, end);
+            mHighlightText = true;
+        }
+
+        void eraseSelection()
+        {
+            if (!mHighlightText || mSelectionStart == mSelectionEnd) return;
+            const unsigned int start = mSelectionStart;
+            const unsigned int end = mSelectionEnd;
+            string before = mText.substr(0, start);
+            string after = mText.substr(end);
+            setText(before + after);
+            setCursorIndex(static_cast<int>(start));
+            clearSelection();
+        }
+
+        // Map an x-position to a character index in the full rendered string
+        unsigned int indexAtPosition(float x) const
+        {
+            const int padding = static_cast<int>(mHighlightPadding);
+            const float hashWidthValue = (mType == ofxDatGuiInputType::COLORPICKER) ? hashWidth() : 0.f;
+            const float avail = std::max(0.f, mInputRect.width - 2 * padding - hashWidthValue);
+
+            const int n = static_cast<int>(mRendered.size());
+            const int cursorIndex = std::min<int>(mCursorIndex, n);
+
+            std::vector<float> prefix(n + 1, 0.f);
+            for (int i = 0; i < n; ++i) {
+                prefix[i + 1] = prefix[i] + glyphWidth(i);
+            }
+            auto widthRange = [&](int i, int j) -> float {
+                return prefix[j] - prefix[i];
+            };
+
+            int startIndex = cursorIndex;
+            for (int s = cursorIndex; s >= 0; --s) {
+                float w = widthRange(s, cursorIndex);
+                if (w <= avail) {
+                    startIndex = s;
+                } else {
+                    break;
+                }
+            }
+
+            int endIndex = cursorIndex;
+            for (int e = cursorIndex; e <= n; ++e) {
+                float w = widthRange(startIndex, e);
+                if (w <= avail) {
+                    endIndex = e;
+                } else {
+                    break;
+                }
+            }
+
+            if (endIndex == startIndex && cursorIndex < n) {
+                startIndex = cursorIndex;
+                endIndex = cursorIndex + 1;
+            }
+
+            float localX = x - (mInputRect.x + padding + hashWidthValue);
+            if (localX <= 0.f) return static_cast<unsigned int>(startIndex);
+
+            float acc = 0.f;
+            for (int i = startIndex; i < endIndex; ++i) {
+                float cw = glyphWidth(i);
+                if (localX < acc + cw * 0.5f) {
+                    return static_cast<unsigned int>(i);
+                }
+                acc += cw;
+            }
+            return static_cast<unsigned int>(endIndex);
         }
 
 };

@@ -207,6 +207,7 @@ public:
 
 	void setTheme(const ofxDatGuiTheme * theme) override {
 		setComponentStyle(theme);
+		mAppliedTheme = theme ? theme : ofxDatGuiComponent::getTheme();
 		mIconOpen = theme->icon.groupOpen;
 		mIconClosed = theme->icon.groupClosed;
 		mHeaderHeight = mStyle.height; // Header uses component height
@@ -250,6 +251,7 @@ public:
 	}
 
 	void drawColorPicker() override {
+		if (!mIsExpanded) return;
 		for (auto & picker : pickers)
 			picker->drawColorPicker();
 	}
@@ -259,6 +261,17 @@ public:
 		if (!mVisible) return;
 		
 		ofPushStyle();
+
+		// When the root is sliding panels off-screen, avoid stacking
+		// an extra backdrop so opacity stays consistent with other items.
+		const bool skipBackdrop = isRootSlidingPanels();
+
+		// Draw a single backdrop over the entire folder region so gaps aren't transparent.
+		const int folderHeight = getHeight();
+		if (folderHeight > 0 && !skipBackdrop) {
+			ofSetColor(mStyle.color.panelBackground, mStyle.opacity);
+			ofDrawRectangle(x, y, mStyle.width, folderHeight);
+		}
 		
 		// Draw header (clickable region, not a button widget)
 		drawHeader();
@@ -266,10 +279,8 @@ public:
 		// Draw children if expanded
 		if (mIsExpanded) {
 			ofxDatGuiContainer::draw(); // Draw children via container
+			drawColorPicker();
 		}
-		
-		// Draw color pickers
-		drawColorPicker();
 		
 		ofPopStyle();
 	}
@@ -554,6 +565,12 @@ public:
 		
 		item->setStripeColor(mStyle.stripe.color);
 		item->onInternalEvent(this, &ofxDatGuiFolder::dispatchInternalEvent);
+		// Apply the current gui theme so newly added children match headers/panels.
+		const ofxDatGuiTheme* t = mAppliedTheme ? mAppliedTheme : ofxDatGuiComponent::getTheme();
+		if (t != nullptr) {
+			ofxDatGuiComponent::ThemeWidthScope scope;
+			item->setTheme(t);
+		}
 		
 		// Use container's emplaceChild for ownership
 		emplaceChild(ComponentPtr(item));
@@ -609,10 +626,21 @@ protected:
 		
 		int cursorY = y + mHeaderHeight + mStyle.vMargin;
 		mContentHeight = mStyle.vMargin; // Start with top margin
+
+		auto labelFrac = [](ofxDatGuiComponent* c) {
+			const float w = static_cast<float>(c->getWidth());
+			if (w <= 0.f) return 0.35f;
+			float frac = c->getLabelWidth() / w;
+			if (frac <= 0.f) frac = 0.35f;
+			if (frac > 0.6f) frac = 0.6f;
+			return frac;
+		};
 		
 		for (auto & child : children) {
 			if (!child->getVisible()) continue;
 			
+			// Keep children matched to the folder width while capping label share.
+			child->setWidth(mStyle.width, labelFrac(child.get()));
 			child->setPosition(x, cursorY);
 			cursorY += child->getHeight() + mStyle.vMargin;
 			mContentHeight += child->getHeight() + mStyle.vMargin;
@@ -685,6 +713,7 @@ private:
 	bool fToggledThisPress;
 	int mHeaderHeight;
 	int mContentHeight = 0;
+	const ofxDatGuiTheme* mAppliedTheme = nullptr;
 	
 	// Icons for expand/collapse
 	shared_ptr<ofImage> mIconOpen;

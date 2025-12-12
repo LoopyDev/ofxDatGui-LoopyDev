@@ -6,10 +6,14 @@
 #include "../components/ofxDatGuiSlider.h"
 #include "../components/ofxDatGuiLabel.h"
 #include "../components/ofxDatGuiTextInput.h"
+#include "../components/ofxDatGui2dPad.h"
+#include "../components/ofxDatGuiTimeGraph.h"
 #include <algorithm>
+#include <initializer_list>
 
 class ofxDatGui; // forward declaration for getRoot/bringToFront
 class ofxDatGuiDropdown;
+class ofxDatGuiFolder;
 
 // Simple container panel that lays out its children either
 // vertically (one per row) or horizontally (in a single row).
@@ -20,6 +24,15 @@ public:
 	enum class Orientation {
 		VERTICAL,
 		HORIZONTAL
+	};
+
+	// Simple edge anchoring for manual layout: pin to screen edges.
+	enum class Anchor {
+		NONE   = 0,
+		TOP    = 1 << 0,
+		BOTTOM = 1 << 1,
+		LEFT   = 1 << 2,
+		RIGHT  = 1 << 3
 	};
 
 	explicit ofxDatGuiPanel(Orientation orientation = Orientation::VERTICAL)
@@ -98,6 +111,9 @@ public:
 		// auto-stack children vertically. We fully control child layout.
 		x = px;
 		y = py;
+		if (mAnchorMask != 0) {
+			cacheAnchorOffsets(ofGetWidth(), ofGetHeight());
+		}
 		layoutChildren();
 	}
 
@@ -123,7 +139,14 @@ public:
 			mUserWidthSet = true;
 		}
 
+		if (mAnchorMask != 0) {
+			cacheAnchorOffsets(ofGetWidth(), ofGetHeight());
+		}
+
 		layoutChildren();
+		if (mAnchorMask != 0) {
+			applyAnchor(ofGetWidth(), ofGetHeight());
+		}
 	}
 
 	int getHeight() override {
@@ -133,6 +156,53 @@ public:
 	bool getIsExpanded() override {
 		// Panels don't implement collapse/expand; treat as always expanded.
 		return true;
+	}
+
+	// ---------------------------------------------------------------------
+	// Anchoring
+	// ---------------------------------------------------------------------
+	void setAnchor(Anchor anchor) {
+		mAnchorMask = static_cast<int>(anchor);
+		cacheAnchorOffsets(ofGetWidth(), ofGetHeight());
+		applyAnchor(ofGetWidth(), ofGetHeight());
+	}
+
+	void setAnchor(std::initializer_list<Anchor> anchors) {
+		mAnchorMask = 0;
+		for (auto a : anchors) {
+			mAnchorMask |= static_cast<int>(a);
+		}
+		cacheAnchorOffsets(ofGetWidth(), ofGetHeight());
+		applyAnchor(ofGetWidth(), ofGetHeight());
+	}
+
+	Anchor getAnchor() const { return static_cast<Anchor>(mAnchorMask); }
+
+	// Recompute anchored position for a given viewport size.
+	void applyAnchor(int windowW, int windowH) {
+		if (mAnchorMask == 0) return;
+		if (mApplyingAnchor) return;
+
+		mApplyingAnchor = true;
+		int newX = x;
+		int newY = y;
+
+		if (hasAnchor(Anchor::LEFT)) {
+			newX = mAnchorOffsetLeft;
+		} else if (hasAnchor(Anchor::RIGHT)) {
+			newX = windowW - getWidth() - mAnchorOffsetRight;
+		}
+
+		if (hasAnchor(Anchor::TOP)) {
+			newY = mAnchorOffsetTop;
+		} else if (hasAnchor(Anchor::BOTTOM)) {
+			newY = windowH - getHeight() - mAnchorOffsetBottom;
+		}
+
+		x = newX;
+		y = newY;
+		layoutChildren();
+		mApplyingAnchor = false;
 	}
 
 	// Enable a simple header bar that shows the panel label and allows dragging.
@@ -145,6 +215,20 @@ public:
 
 	bool hasHeader() const { return mHeaderEnabled; }
 
+	// Control whether the panel can be dragged by its header.
+	void setDraggable(bool enable = true) {
+		mDraggable = enable;
+		if (!mDraggable) mDragging = false;
+	}
+	bool getDraggable() const { return mDraggable; }
+
+	// Prevent dragging the panel outside the window bounds.
+	// Calling this opts the panel out of inheriting the root setting.
+	void setClampDragToWindow(bool enable = true) { mClampDragOverride = true; mClampDragToWindow = enable; }
+	// Return to inheriting the root clamp setting.
+	void setClampDragToWindowInherit() { mClampDragOverride = false; }
+	bool getClampDragToWindow() const { return mClampDragOverride ? mClampDragToWindow : isRootClampingPanels(); }
+
 	void update(bool acceptEvents = true) override {
 		// Panels are layout-only containers; we don't want them to
 		// steal mouse presses from their children. The base
@@ -156,17 +240,11 @@ public:
 		float oldHeight = mStyle.height;
 		if (!mHeaderEnabled) mStyle.height = 0;
 
-		ofxDatGuiComponent::update(acceptEvents);
+		// Delegate interaction/update to container traversal (handles text-input locks).
+		ofxDatGuiContainer::update(acceptEvents);
 
-		// Restore whatever height the theme/layout wants to use
-		// for drawing / layout purposes.
+		// Restore whatever height the theme/layout wants to use for drawing/layout.
 		mStyle.height = oldHeight;
-
-		// Now update children with same enabled flag.
-		const bool enabled = acceptEvents && getEnabled();
-		for (auto & c : children) {
-			c->update(enabled);
-		}
 	}
 
 
@@ -175,65 +253,24 @@ public:
 
 		ofPushStyle();
 
-		ofColor headerColor = mStyle.color.background;
-		if (const ofxDatGuiTheme* t = ofxDatGuiComponent::getTheme()) {
-			headerColor = t->color.panelHeader;
+		ofColor headerColor = mStyle.color.panelHeader;
+
+		// Paint a single backdrop covering the whole panel so spacing gaps aren't transparent.
+		int panelHeight = mHeight;
+		if (panelHeight <= 0 && mHeaderEnabled) panelHeight = mHeaderHeight;
+		if (panelHeight > 0) {
+			ofSetColor(mStyle.color.panelBackground, mStyle.opacity);
+			ofDrawRectangle(x, y, mStyle.width, panelHeight);
 		}
 
 		if (mHeaderEnabled) {
-			ofSetColor(headerColor, mStyle.opacity * 255);
+			ofSetColor(headerColor, mStyle.opacity);
 			ofDrawRectangle(x, y, mStyle.width, mHeaderHeight);
 			ofSetColor(mLabel.color);
 			if (mFont) {
 				mFont->draw(mLabel.rendered, x + mLabel.x, y + mHeaderHeight/2 + mLabel.rect.height/2);
 			}
 		}
-
-		// Fill the spacing gaps with the same color as the header so they aren't transparent.
-		if (mSpacing > 0) {
-			ofSetColor(headerColor, mStyle.opacity * 255);
-			if (mOrientation == Orientation::VERTICAL) {
-				ofxDatGuiComponent* previous = nullptr;
-				for (auto& c : children) {
-					if (!c->getVisible()) continue;
-					if (previous != nullptr) {
-						int gapY = previous->getY() + previous->getHeight();
-						int gapH = c->getY() - gapY;
-						if (gapH > 0) {
-							ofDrawRectangle(x, gapY, mStyle.width, gapH);
-						}
-					}
-					previous = c.get();
-				}
-			} else {
-				int rowY = y + (mHeaderEnabled ? mHeaderHeight : 0);
-				int rowHeight = std::max(0, mHeight - (mHeaderEnabled ? mHeaderHeight : 0));
-				if (rowHeight == 0) {
-					for (auto& c : children) {
-						if (!c->getVisible()) continue;
-						rowHeight = std::max(rowHeight, c->getHeight());
-					}
-				}
-				if (rowHeight > 0) {
-					ofxDatGuiComponent* previous = nullptr;
-					for (auto& c : children) {
-						if (!c->getVisible()) continue;
-						if (previous != nullptr) {
-							int gapX = previous->getX() + previous->getWidth();
-							int gapW = c->getX() - gapX;
-							if (gapW > 0) {
-								ofDrawRectangle(gapX, rowY, gapW, rowHeight);
-							}
-						}
-						previous = c.get();
-					}
-				}
-			}
-		}
-		// Panel itself stays visually transparent by default.
-		// If you ever want a framed block, uncomment:
-		// drawBackground();
-		// drawBorder();
 
 		for (auto & c : children) {
 			if (!c->getVisible()) continue;
@@ -323,9 +360,28 @@ public:
 	}
 
 	ofxDatGuiDropdown* addDropdown(const std::string & label, const std::vector<std::string> & options);
+	ofxDatGuiFolder* addFolder(const std::string & label, ofColor color = ofColor::white);
 
 	ofxDatGuiLabel* addLabel(const std::string & label) {
 		auto item = std::make_unique<ofxDatGuiLabel>(label);
+		item->setStripeColor(mStyle.stripe.color);
+		return attachOwned(std::move(item));
+	}
+
+	ofxDatGui2dPad* add2dPad(const std::string & label) {
+		auto item = std::make_unique<ofxDatGui2dPad>(label);
+		item->setStripeColor(mStyle.stripe.color);
+		return attachOwned(std::move(item));
+	}
+
+	ofxDatGuiWaveMonitor* addWaveMonitor(const std::string & label, float frequency, float amplitude) {
+		auto item = std::make_unique<ofxDatGuiWaveMonitor>(label, frequency, amplitude);
+		item->setStripeColor(mStyle.stripe.color);
+		return attachOwned(std::move(item));
+	}
+
+	ofxDatGuiValuePlotter* addValuePlotter(const std::string & label, float min, float max) {
+		auto item = std::make_unique<ofxDatGuiValuePlotter>(label, min, max);
 		item->setStripeColor(mStyle.stripe.color);
 		return attachOwned(std::move(item));
 	}
@@ -353,7 +409,7 @@ protected:
 			if (w <= 0.f) return 0.35f;
 			float frac = c->getLabelWidth() / w;
 			if (frac <= 0.f) frac = 0.35f;
-			if (frac > 0.95f) frac = 0.95f; // always leave some room for the control itself
+			if (frac > 0.6f) frac = 0.6f; // limit label dominance to keep sliders/inputs roomy
 			return frac;
 		};
 
@@ -435,11 +491,16 @@ protected:
 			mHeight = rowHeight;
 			if (mHeaderEnabled) mHeight = rowHeight + mHeaderHeight;
 		}
+
+		// If anchored, reposition after any size change (guarded to avoid recursion).
+		if (mAnchorMask != 0 && !mApplyingAnchor) {
+			applyAnchor(ofGetWidth(), ofGetHeight());
+		}
 	}
 
 	// Internal events coming from children (visibility changes, etc.).
 	void onInternalChildEvent(ofxDatGuiInternalEvent e) {
-		if (e.type == ofxDatGuiEventType::VISIBILITY_CHANGED) {
+		if (e.type == ofxDatGuiEventType::VISIBILITY_CHANGED || e.type == ofxDatGuiEventType::GROUP_TOGGLED) {
 			layoutChildren();
 		}
 
@@ -470,7 +531,7 @@ protected:
 
 	// Basic dragging when header is enabled.
 	void onMousePress(ofVec3f m) override {
-		if (mHeaderEnabled) {
+		if (mHeaderEnabled && mDraggable) {
 			bool inHeader = m.x >= x && m.x <= x + mStyle.width && m.y >= y && m.y <= y + mHeaderHeight;
 			if (inHeader) {
 				mDragging = true;
@@ -480,8 +541,36 @@ protected:
 		ofxDatGuiComponent::onMousePress(m);
 	}
 	void onMouseDrag(ofVec3f m) override {
-		if (mHeaderEnabled && mDragging) {
-			setPosition(static_cast<int>(m.x - mDragOffset.x), static_cast<int>(m.y - mDragOffset.y));
+		if (mHeaderEnabled && mDraggable && mDragging) {
+			int newX = static_cast<int>(m.x - mDragOffset.x);
+			int newY = static_cast<int>(m.y - mDragOffset.y);
+
+			bool clamp = mClampDragOverride ? mClampDragToWindow : isRootClampingPanels();
+
+			if (clamp) {
+				const int winW = ofGetWidth();
+				const int winH = ofGetHeight();
+				const int w = getWidth();
+				int h = getHeight();
+				if (h <= 0 && mHeaderEnabled) h = mHeaderHeight;
+
+				const int minVisW = std::min(w, getRootClampMinVisibleWidth());
+				const int minVisH = std::min(h, getRootClampMinVisibleHeight());
+
+				if (winW > 0 && w > 0) {
+					int maxX = winW - minVisW;
+					int minX = -std::max(0, w - minVisW);
+					newX = std::clamp(newX, minX, maxX);
+				}
+				if (winH > 0 && h > 0) {
+					int maxY = winH - minVisH;
+					// Never allow the panel to move above the top edge; keep header reachable.
+					int minY = 0;
+					newY = std::clamp(newY, minY, maxY);
+				}
+			}
+
+			setPosition(newX, newY);
 		}
 		ofxDatGuiComponent::onMouseDrag(m);
 	}
@@ -500,6 +589,27 @@ protected:
 		return (m.x >= x && m.x <= x + mStyle.width && m.y >= y && m.y <= y + h);
 	}
 
+	bool hasAnchor(Anchor anchor) const {
+		return (mAnchorMask & static_cast<int>(anchor)) != 0;
+	}
+
+	void cacheAnchorOffsets(int windowW, int windowH) {
+		if (mAnchorMask == 0) return;
+
+		if (hasAnchor(Anchor::LEFT)) {
+			mAnchorOffsetLeft = x;
+		}
+		if (hasAnchor(Anchor::TOP)) {
+			mAnchorOffsetTop = y;
+		}
+		if (hasAnchor(Anchor::RIGHT)) {
+			mAnchorOffsetRight = std::max(0, windowW - (x + getWidth()));
+		}
+		if (hasAnchor(Anchor::BOTTOM)) {
+			mAnchorOffsetBottom = std::max(0, windowH - (y + getHeight()));
+		}
+	}
+
 
 	Orientation mOrientation;
 	int mHeight;
@@ -507,7 +617,18 @@ protected:
 	bool mHeaderEnabled;
 	int mHeaderHeight;
 	bool mDragging = false;
+	bool mDraggable = true;
+	bool mClampDragOverride = false;
+	bool mClampDragToWindow = false;
 	ofPoint mDragOffset;
+
+	// Anchoring state
+	int mAnchorMask = 0;
+	int mAnchorOffsetLeft = 0;
+	int mAnchorOffsetRight = 0;
+	int mAnchorOffsetTop = 0;
+	int mAnchorOffsetBottom = 0;
+	bool mApplyingAnchor = false;
 
 	// Helper to take ownership and return raw for convenience.
 	template<typename T>

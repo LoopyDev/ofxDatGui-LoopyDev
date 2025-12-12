@@ -41,6 +41,7 @@ class ofxSmartFont {
         ofRectangle rect(std::string s, int x=0, int y=0);
         float width(std::string s, int x=0, int y=0);
         float height(std::string s, int x=0, int y=0);
+        float charAdvance(uint32_t c);
         float getLineHeight();
     
     /*
@@ -80,4 +81,3 @@ class ofxSmartFont {
         ofTrueTypeFont ttf;
     
 };
-

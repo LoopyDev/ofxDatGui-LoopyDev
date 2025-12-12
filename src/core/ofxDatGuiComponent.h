@@ -98,6 +98,8 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         virtual void draw();
         virtual void update(bool acceptEvents = true);
         virtual bool hitTest(ofPoint m);
+        virtual bool hasFocusedTextInputField() { return false; }
+        virtual bool hitTestTextInputField(const ofPoint & /*m*/) { return false; }
 
         virtual void setPosition(int x, int y);
         virtual void setTheme(const ofxDatGuiTheme* theme) = 0;
@@ -116,6 +118,13 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         // Root association (non-owning).
         virtual void setRoot(ofxDatGui* r) { mRoot = r; }
         ofxDatGui* getRoot() const { return mRoot; }
+        bool isRootClampingPanels() const;
+        int getRootClampMinVisibleWidth() const;
+        int getRootClampMinVisibleHeight() const;
+        bool isRootSlidingPanels() const;
+        // Whether this component participates in root-level slide in/out.
+        void setParticipatesInRootSlide(bool enable) { mAllowSlideEffect = enable; }
+        bool getParticipatesInRootSlide() const { return mAllowSlideEffect; }
         void setParent(ofxDatGuiComponent* p) { mParent = p; }
         ofxDatGuiComponent* getParent() const { return mParent; }
 
@@ -158,6 +167,7 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         ofxDatGuiAnchor mAnchor;
         shared_ptr<ofxSmartFont> mFont;
         bool mPreventMuting = false;
+        bool mAllowSlideEffect = true;
         bool mUserWidthSet = false;
         bool mHasAppliedWidth = false;
         bool mUserStripeOverride = false;
@@ -169,6 +179,8 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
             float vMargin;
             float opacity;
             struct{
+                ofColor panelBackground;
+                ofColor panelHeader;
                 ofColor inputArea;
                 ofColor background;
                 ofColor onMouseOver;
@@ -221,4 +233,3 @@ class ofxDatGuiComponent : public ofxDatGuiInteractiveObject
         static std::unique_ptr<ofxDatGuiTheme> theme;
     
 };
-

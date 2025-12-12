@@ -69,6 +69,11 @@ float ofxSmartFont::height(std::string s, int x, int y)
     return ttf.getStringBoundingBox(s, x, y).height;
 }
 
+float ofxSmartFont::charAdvance(uint32_t c)
+{
+    return ttf.getCharAdvance(c);
+}
+
 float ofxSmartFont::getLineHeight()
 {
     return ttf.getLineHeight();
@@ -145,4 +150,3 @@ void ofxSmartFont::log(std::string msg)
 {
     std::cout << "ofxSmartFont :: "<< msg << std::endl;
 }
-
